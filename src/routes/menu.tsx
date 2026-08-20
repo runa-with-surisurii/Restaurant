@@ -1,104 +1,1196 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Loader2, Plus, Search, ShoppingCart } from "lucide-react";
 import { SiteLayout } from "@/components/site-layout";
-import { DishCard } from "@/components/dish-card";
-import { categories, dishes } from "@/lib/data";
+import { useCart } from "@/lib/cart";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/menu")({
   head: () => ({
-    meta: [
-      { title: "Menu — Ember & Oak" },
-      { name: "description", content: "Explore Ember & Oak's fire-kitchen menu — burgers, wood-fired pizza, grill, pasta, and more." },
-      { property: "og:title", content: "Menu — Ember & Oak" },
-      { property: "og:description", content: "Explore Ember & Oak's fire-kitchen menu — burgers, wood-fired pizza, grill, pasta, and more." },
+    meta:[
+
+      {
+        title: "Menu — Ember & Oak",
+      },
+
+      {
+        name: "description",
+        content: "Explore restaurant menu."
+      }
+
     ],
   }),
+
   component: MenuPage,
 });
 
-type SortKey = "popular" | "price-asc" | "price-desc" | "rating";
+type Dish = {
+  id: string;
 
-function MenuPage() {
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<string>("all");
-  const [sort, setSort] = useState<SortKey>("popular");
+  name: string;
 
-  const list = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let out = dishes.filter((d) => (category === "all" || d.categoryId === category) && (!q || d.name.toLowerCase().includes(q) || d.description.toLowerCase().includes(q)));
-    switch (sort) {
-      case "price-asc": out = [...out].sort((a, b) => a.price - b.price); break;
-      case "price-desc": out = [...out].sort((a, b) => b.price - a.price); break;
-      case "rating": out = [...out].sort((a, b) => b.rating - a.rating); break;
-      default: out = [...out].sort((a, b) => b.reviewCount - a.reviewCount);
-    }
-    return out;
-  }, [query, category, sort]);
+  description: string;
 
-  return (
-    <SiteLayout>
-      <section className="border-b border-border bg-muted/40">
-        <div className="mx-auto max-w-7xl px-4 py-12 md:px-6">
-          <h1 className="font-display text-5xl md:text-6xl">The full menu</h1>
-          <p className="mt-2 max-w-xl text-muted-foreground">Search, filter, and sort — from ember-charred starters to molten desserts.</p>
+  price: number;
 
-          <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search dishes…"
-                className="w-full rounded-full border border-input bg-background py-3 pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-            <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="rounded-full border border-input bg-background px-4 py-3 text-sm outline-none focus:border-primary">
-              <option value="popular">Most popular</option>
-              <option value="rating">Highest rated</option>
-              <option value="price-asc">Price: low to high</option>
-              <option value="price-desc">Price: high to low</option>
-            </select>
-          </div>
+  image: string;
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <FilterChip active={category === "all"} onClick={() => setCategory("all")}>All</FilterChip>
-            {categories.map((c) => (
-              <FilterChip key={c.id} active={category === c.id} onClick={() => setCategory(c.id)}>
-                <span>{c.emoji}</span> {c.name}
-              </FilterChip>
-            ))}
-          </div>
-        </div>
-      </section>
+  categoryId: string;
 
-      <section className="mx-auto max-w-7xl px-4 py-10 md:px-6">
-        {list.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground">
-            No dishes match your filters.
-          </div>
-        ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {list.map((d, i) => <DishCard key={d.id} dish={d} index={i} />)}
-          </div>
-        )}
-      </section>
-    </SiteLayout>
-  );
+  rating: number;
+
+  reviewCount: number;
+};
+
+type ApiMenuItem = {
+  id?: number | string;
+
+  name?: string;
+  description?: string;
+
+  MenuItemName?: string;
+  MenuItemDescription?: string;
+
+  category?: string;
+
+  price?: number;
+
+  image?: string;
+};
+
+
+
+
+
+
+type SortKey =
+
+"popular"
+
+|
+
+"price-asc"
+
+|
+
+"price-desc"
+
+|
+
+"rating";
+
+
+
+
+
+
+
+
+
+const categories = [
+
+
+{
+
+id:"all",
+
+name:"All",
+
+emoji:"🍽️"
+
+},
+
+
+
+{
+
+id:"sandwiches",
+
+name:"Sandwiches",
+
+emoji:"🥪"
+
+},
+
+
+
+// {
+    // id: "burgers",
+// name:"Burgers",
+// emoji:"🍔"
+// 
+  // },
+
+
+
+{
+
+id:"pizza",
+
+name:"Pizza",
+
+emoji:"🍕"
+
+},
+
+
+
+{
+    id: "drinks",
+    name: "Drinks",
+    emoji: "🥤",
+},
+
+  {
+    id: "desserts",
+    name: "Desserts",
+    emoji: "🍰",
+  },
+
+
+
+{
+
+id:"other",
+name:"Other",
+emoji:"🍴"
+
 }
 
-function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-        active ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-card hover:border-primary/50",
-      )}
-    >
-      {children}
-    </button>
-  );
+
+
+];
+
+function getDefaultPrice(category: string) {
+  switch (category) {
+
+//  case "burgers":
+//    return 6;
+    case "pizza":
+      return 7;
+
+    case "sandwiches":
+      return 5;
+
+    case "drinks":
+      return 2;
+
+    case "desserts":
+      return 1.5;
+
+    default:
+      return 5;
+  }
+}
+
+function formatMenuName(name:string){
+  const n = name.toLowerCase();
+
+  if (n.includes("chpizza")) return "Chicken Pizza";
+  if (n.includes("vgpizza")) return "Veggie Pizza";
+  if (n.includes("ham")) return "Ham Sandwich";
+  if (n.includes("cookie")) return "Cookie";
+  if (n.includes("coke")) return "Coca Cola";
+  return name;
+}
+
+function detectCategory(text:string){
+
+const n = text.toLowerCase();
+
+
+// =======================
+// PIZZA
+// =======================
+
+if(
+ n.includes("pizza") ||
+ n.includes("piza") ||
+ n.includes("piz")
+){
+ return "pizza";
+}
+
+
+
+// =======================
+// DRINKS
+// =======================
+
+if(
+ n.includes("coffee") ||
+ n.includes("coke") ||
+ n.includes("cola") ||
+ n.includes("water") ||
+ n.includes("fountain") ||
+ n.includes("tea") ||
+ n.includes("drink")
+){
+ return "drinks";
+}
+
+
+
+// =======================
+// DESSERT
+// =======================
+
+if(
+ n.includes("cookie") ||
+ n.includes("dessert")
+){
+ return "desserts";
+}
+
+
+
+// =======================
+// SANDWICH
+// IMPORTANT: Subway abbreviations
+// =======================
+
+if(
+ n.includes("ham") ||
+    n.includes("steak") ||
+ n.includes("chicken") ||
+ n.includes("turkey") ||
+ n.includes("ftl") ||
+ n.includes("six") ||
+ n.includes("ffb") ||
+ n.includes("fbd") ||
+  n.includes("FtFbd") ||
+ n.includes("flatbd") ||
+  n.includes("chse") ||
+ n.includes("sub")
+){
+ return "sandwiches";
+}
+
+
+
+return "other";
+
+
+}
+
+function convertMenuItem(item: ApiMenuItem, index: number): Dish {
+  const rawName = item.name?.trim() || item.MenuItemName?.trim() || `Menu Item ${index + 1}`;
+
+  const name = formatMenuName(rawName);
+
+  const categoryId = detectCategory(name + " " + item.description);
+  console.log(name, categoryId);
+  return {
+    id: String(item.id ?? index),
+    name,
+    description: item.description || item.MenuItemDescription || "Delicious menu item.",
+    price: Number(item.price) || getDefaultPrice(categoryId),
+
+    image: item.image || "",
+    categoryId,
+    rating: 4.5,
+    reviewCount: 0,
+  };
+}
+
+function MenuPage() {
+  const [menu, setMenu] = useState<Dish[]>([]);
+
+  const [query, setQuery] = useState("");
+
+  const [category, setCategory] = useState("all");
+
+  const [sort, setSort] = useState<SortKey>("popular");
+
+  const [loading, setLoading] = useState(true);
+
+  const [error, setError] = useState("");
+
+  const { addItem, items } = useCart();
+
+// =====================================================
+// LOAD MENU
+// =====================================================
+
+  useEffect(() => {
+    async function loadMenu() {
+
+
+try{
+
+
+setLoading(true);
+
+setError("");
+
+
+
+const response = await fetch(
+
+"http://127.0.0.1:8000/api/menu"
+
+);
+
+
+
+if(!response.ok){
+
+
+throw new Error(
+"Failed to load menu"
+);
+
+
+}
+
+
+
+const data =
+await response.json();
+
+
+
+
+
+const apiItems =
+
+
+Array.isArray(data)
+
+?
+
+data
+
+:
+
+data.items || [];
+
+
+
+
+
+
+const converted =
+
+
+apiItems.map(
+
+(item:ApiMenuItem,index:number)=>
+
+convertMenuItem(
+item,
+index
+)
+
+);
+
+
+
+
+
+setMenu(converted);
+
+
+
+}
+
+catch(err){
+
+
+
+console.log(
+err
+);
+
+
+
+setError(
+
+err instanceof Error
+
+?
+
+err.message
+
+:
+
+"Unable to load menu"
+
+);
+
+
+}
+
+
+finally{
+
+
+setLoading(false);
+
+
+}
+
+
+
+}
+
+
+
+loadMenu();
+
+
+
+},[]);
+
+
+
+
+
+
+
+
+
+// =====================================================
+// FILTER
+// =====================================================
+
+
+const list = useMemo(()=>{
+
+
+const search =
+
+query
+.trim()
+.toLowerCase();
+
+
+
+
+
+let result = menu.filter((dish)=>{
+
+
+
+const categoryMatch =
+
+
+category==="all"
+
+||
+
+dish.categoryId===category;
+
+
+
+
+
+const searchMatch =
+
+
+!search
+
+||
+
+dish.name
+.toLowerCase()
+.includes(search)
+
+;
+
+
+
+return (
+
+categoryMatch
+
+&&
+
+searchMatch
+
+);
+
+
+
+});
+
+
+
+
+
+
+switch(sort){
+
+
+
+case "price-asc":
+
+
+result.sort(
+
+(a,b)=>
+
+a.price-b.price
+
+);
+
+
+break;
+
+
+
+
+case "price-desc":
+
+
+result.sort(
+
+(a,b)=>
+
+b.price-a.price
+
+);
+
+
+break;
+
+
+
+case "rating":
+
+
+result.sort(
+
+(a,b)=>
+
+b.rating-a.rating
+
+);
+
+
+break;
+
+
+
+
+default:
+
+
+result.sort(
+
+(a,b)=>
+
+b.reviewCount-a.reviewCount
+
+);
+
+
+}
+
+
+
+
+
+return result;
+
+
+
+},[
+
+menu,
+
+query,
+
+category,
+
+sort
+
+
+]);
+
+
+
+
+
+
+
+
+const cartCount =
+
+
+items.reduce(
+
+(total,item)=>
+
+total + item.quantity,
+
+0
+
+);
+
+
+
+
+
+
+return (
+
+<SiteLayout>
+
+
+<section className="
+border-b
+bg-muted/20
+">
+
+
+<div className="
+mx-auto
+max-w-7xl
+px-4
+py-10
+">
+
+
+<div className="
+flex
+justify-between
+items-start
+">
+
+
+<div>
+
+
+<p className="
+text-xs
+font-semibold
+uppercase
+tracking-widest
+text-primary
+">
+
+Ember & Oak
+
+</p>
+
+
+
+<h1 className="
+text-5xl
+font-bold
+mt-2
+">
+
+Full Menu
+
+</h1>
+
+
+
+<p className="
+text-muted-foreground
+mt-3
+">
+
+Choose your favourite menu items
+
+</p>
+
+
+</div>
+
+
+
+
+
+
+<Link
+
+to="/cart"
+
+className="
+rounded-full
+border
+px-4
+py-3
+flex
+gap-2
+items-center
+"
+
+>
+
+
+<ShoppingCart/>
+
+Cart
+
+
+{
+cartCount>0 &&
+
+
+<span className="
+rounded-full
+bg-primary
+text-white
+px-2
+">
+
+{cartCount}
+
+</span>
+
+
+}
+
+
+
+</Link>
+
+</div>
+
+{/* CATEGORY BUTTONS */}
+
+<div className="
+mt-6
+flex
+flex-wrap
+gap-2
+">
+
+
+{
+categories.map((item)=>(
+
+
+<button
+
+
+key={item.id}
+
+
+onClick={()=>setCategory(item.id)}
+
+
+className={cn(
+
+"rounded-full border px-4 py-2 text-sm font-medium",
+
+
+category===item.id
+
+?
+
+"bg-primary text-white"
+
+:
+
+"bg-card"
+
+)}
+
+
+>
+
+
+{item.emoji}
+
+{" "}
+
+{item.name}
+
+
+</button>
+
+
+
+))
+
+
+}
+
+
+</div>
+
+
+
+</div>
+
+
+</section>
+
+
+
+
+
+
+
+{/* MENU LIST */}
+
+
+
+<section className="
+mx-auto
+max-w-7xl
+px-4
+py-10
+">
+
+
+
+
+
+{
+loading &&
+
+
+<div className="
+flex
+justify-center
+p-10
+">
+
+
+<Loader2 className="
+animate-spin
+"/>
+
+
+Loading menu...
+
+
+</div>
+
+
+}
+
+
+
+
+
+
+
+{
+error &&
+
+
+<div className="
+rounded-xl
+border
+p-6
+text-center
+">
+
+
+<AlertCircle/>
+
+
+<p>
+
+{error}
+
+</p>
+
+
+</div>
+
+
+}
+
+
+
+
+
+
+
+
+{
+!loading &&
+
+!error &&
+
+
+
+<div className="
+grid
+gap-6
+sm:grid-cols-2
+lg:grid-cols-3
+xl:grid-cols-4
+">
+
+
+{
+
+
+list.map((dish)=>(
+
+
+
+<div
+
+key={dish.id}
+
+className="
+overflow-hidden
+rounded-2xl
+border
+bg-card
+shadow-sm
+hover:shadow-lg
+transition
+"
+
+>
+
+
+
+
+{/* IMAGE */}
+
+
+<div className="
+h-48
+bg-muted
+flex
+items-center
+justify-center
+overflow-hidden
+">
+
+
+{
+
+
+dish.image
+
+?
+
+
+<img
+
+src={dish.image}
+
+alt={dish.name}
+
+className="
+h-full
+w-full
+object-cover
+"
+
+
+onError={(e)=>{
+
+e.currentTarget.style.display="none";
+
+}}
+
+
+/>
+
+
+:
+
+
+<span className="
+text-6xl
+">
+
+
+{
+
+categories.find(
+
+(c)=>
+
+c.id===dish.categoryId
+
+)?.emoji
+
+}
+
+
+</span>
+
+
+}
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+{/* INFO */}
+
+
+<div className="
+p-4
+">
+
+
+<h2 className="
+font-bold
+text-lg
+">
+
+
+{dish.name}
+
+
+</h2>
+
+
+
+
+
+<p className="
+text-sm
+text-muted-foreground
+mt-1
+">
+
+
+{
+categories.find(
+
+(c)=>
+
+c.id===dish.categoryId
+
+)?.name
+
+}
+
+
+</p>
+
+
+
+
+
+
+<p className="
+text-sm
+text-muted-foreground
+mt-2
+line-clamp-2
+">
+
+
+{dish.description}
+
+
+</p>
+
+
+
+
+
+
+
+
+<div className="
+flex
+justify-between
+items-center
+mt-4
+">
+
+
+<span className="
+font-bold
+text-lg
+">
+
+
+$
+
+{dish.price.toFixed(2)}
+
+
+</span>
+
+
+
+
+
+
+
+<button
+
+
+onClick={()=>addItem(dish)}
+
+
+className="
+rounded-full
+bg-primary
+px-4
+py-2
+text-sm
+font-semibold
+text-white
+flex
+items-center
+gap-2
+"
+
+
+>
+
+
+<Plus size={16}/>
+
+
+Add
+
+
+</button>
+
+
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+</div>
+
+
+
+))
+
+
+}
+
+
+
+
+</div>
+
+
+}
+
+</section>
+
+</SiteLayout>
+
+);
+
+
 }

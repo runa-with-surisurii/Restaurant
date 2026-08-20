@@ -15,11 +15,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider, useStore } from "@/lib/store";
 import { Toaster } from "sonner";
-import {
-  defaultRouteForRole,
-  getUnauthorizedRedirect,
-  isAuthEntryRoute,
-} from "@/lib/auth";
+import { defaultRouteForRole, getUnauthorizedRedirect, isAuthEntryRoute } from "@/lib/auth";
 
 function NotFoundComponent() {
   return (
@@ -87,10 +83,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Ember & Oak — Chain of Fire-Kitchen Restaurants" },
-      { name: "description", content: "Order from Ember & Oak's fire-kitchen menu. Browse dishes, track orders, and discover chef picks across our branches." },
+      {
+        name: "description",
+        content:
+          "Order from Ember & Oak's fire-kitchen menu. Browse dishes, track orders, and discover chef picks across our branches.",
+      },
       { name: "author", content: "Ember & Oak" },
       { property: "og:title", content: "Ember & Oak — Chain of Fire-Kitchen Restaurants" },
-      { property: "og:description", content: "Order from Ember & Oak's fire-kitchen menu. Browse dishes, track orders, and discover chef picks across our branches." },
+      {
+        property: "og:description",
+        content:
+          "Order from Ember & Oak's fire-kitchen menu. Browse dishes, track orders, and discover chef picks across our branches.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -145,26 +149,58 @@ function RootComponent() {
 
 function AppSessionGate({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const pathname = useRouterState({
+    select: (s) => s.location.pathname,
+  });
+
   const { isAuthenticated, currentRole } = useStore();
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      if (!isAuthEntryRoute(pathname)) {
-        navigate({ to: "/login", replace: true });
+    const isAdminRoute = pathname.startsWith("/admin");
+    const isLoginRoute = isAuthEntryRoute(pathname);
+
+    // ==========================================
+    // 1. ADMIN PAGES
+    // ==========================================
+    if (isAdminRoute) {
+      // Not logged in → Login
+      if (!isAuthenticated) {
+        navigate({
+          to: "/login",
+          replace: true,
+        });
+        return;
       }
+
+      // Customer cannot access admin
+      if (currentRole !== "main_admin" && currentRole !== "branch_manager") {
+        navigate({
+          to: "/",
+          replace: true,
+        });
+        return;
+      }
+
+      // Admin / Branch Manager can stay in admin
       return;
     }
 
-    const redirect = getUnauthorizedRedirect(currentRole, pathname);
-    if (redirect && redirect !== pathname) {
-      navigate({ to: redirect, replace: true });
+    // ==========================================
+    // 2. LOGIN / REGISTER
+    // ==========================================
+    if (isLoginRoute && isAuthenticated) {
+      navigate({
+        to: defaultRouteForRole(currentRole),
+        replace: true,
+      });
       return;
     }
 
-    if (isAuthEntryRoute(pathname)) {
-      navigate({ to: defaultRouteForRole(currentRole), replace: true });
-    }
+    // ==========================================
+    // 3. PUBLIC CUSTOMER PAGES
+    // ==========================================
+    // Home, Menu, Branches, Offers, etc.
+    // are allowed without redirecting to /admin.
   }, [currentRole, isAuthenticated, navigate, pathname]);
 
   return <>{children}</>;

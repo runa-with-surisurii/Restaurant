@@ -27,10 +27,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Avatar,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,11 +78,8 @@ import type { Branch } from "@/lib/data";
 export type BranchManagerNavId =
   | "dashboard"
   | "orders"
-  | "menu"
-  | "reservations"
   | "inventory"
   | "reports"
-  | "reviews"
   | "settings"
   | "overview"
   | "branches"
@@ -102,17 +96,86 @@ export type BranchManagerNavItem = {
 };
 
 export const branchManagerNav: BranchManagerNavItem[] = [
-  { id: "dashboard", to: "/branch-manager", label: "Dashboard", icon: LayoutDashboard, section: "branch", description: "Today's KPIs, charts & activity feed" },
-  { id: "orders", to: "/branch-manager/orders", label: "Orders", icon: ShoppingBag, section: "branch", description: "Manage live orders" },
-  { id: "menu", to: "/branch-manager/menu-availability", label: "Inventory", icon: UtensilsCrossed, section: "branch", description: "Toggle item availability" },
-  { id: "reservations", to: "/branch-manager/bookings", label: "Reservations", icon: CalendarDays, section: "branch", description: "Floor plan & bookings" },
-  { id: "inventory", to: "/branch-manager/inventory", label: "Inventory", icon: Package, section: "branch", description: "Stock levels & reorder alerts" },
-  { id: "reports", to: "/branch-manager/sales-reports", label: "Reports", icon: TrendingUp, section: "branch", description: "Revenue, peaks & trends" },
-  { id: "reviews", to: "/branch-manager/customer-reviews", label: "Staff", icon: Star, section: "branch", description: "Ratings, feedback & replies" },
-  { id: "settings", to: "/branch-manager/settings", label: "Settings", icon: SettingsIcon, section: "branch", description: "Branch preferences" },
-  { id: "overview", to: "/admin/overview", label: "Chain Overview", icon: Sparkles, section: "chain", description: "Roll-up across all locations" },
-  { id: "branches", to: "/admin/branches", label: "Branches", icon: Building2, section: "chain", description: "Add, edit & onboard locations" },
-  { id: "menu-editor", to: "/admin/menu", label: "Menu Editor", icon: BookOpen, section: "chain", description: "Chain-wide dish catalog" },
+
+  {
+    id:"dashboard",
+    to:"/branch-manager",
+    label:"Dashboard",
+    icon:LayoutDashboard,
+    section:"branch",
+    description:"Today's KPIs, charts & activity feed",
+  },
+
+
+  {
+    id:"orders",
+    to:"/branch-manager/orders",
+    label:"Orders",
+    icon:ShoppingBag,
+    section:"branch",
+    description:"Manage live orders",
+  },
+
+
+  {
+    id:"inventory",
+    to:"/branch-manager/inventory",
+    label:"Inventory",
+    icon:Package,
+    section:"branch",
+    description:"Ingredient stock levels & alerts",
+  },
+
+
+  {
+    id:"reports",
+    to:"/branch-manager/sales-reports",
+    label:"Reports",
+    icon:TrendingUp,
+    section:"branch",
+    description:"Revenue and sales analysis",
+  },
+
+
+  {
+    id:"settings",
+    to:"/branch-manager/settings",
+    label:"Settings",
+    icon:SettingsIcon,
+    section:"branch",
+    description:"Branch preferences",
+  },
+
+
+  {
+    id:"overview",
+    to:"/admin/overview",
+    label:"Chain Overview",
+    icon:Sparkles,
+    section:"chain",
+    description:"Roll-up across locations",
+  },
+
+
+  {
+    id:"branches",
+    to:"/admin/branches",
+    label:"Branches",
+    icon:Building2,
+    section:"chain",
+    description:"Manage branches",
+  },
+
+
+  {
+    id:"menu-editor",
+    to:"/admin/menu",
+    label:"Menu Editor",
+    icon:BookOpen,
+    section:"chain",
+    description:"Chain-wide menu",
+  },
+
 ];
 
 type ShellCtx = {
@@ -146,7 +209,9 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [section, setSection] = useState<"branch" | "chain">(adminUser?.role === "main_admin" ? "chain" : "branch");
+  const [section, setSection] = useState<"branch" | "chain">(
+    adminUser?.role === "main_admin" ? "chain" : "branch",
+  );
 
   const isMainAdmin = adminUser?.role === "main_admin";
   const forcedBranch = adminUser?.branchId;
@@ -194,12 +259,13 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
     setSection,
   };
 
-  const initials = (adminUser?.name ?? "BM")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase() ?? "")
-    .join("") || "BM";
+  const initials =
+    (adminUser?.name ?? "BM")
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((s) => s[0]?.toUpperCase() ?? "")
+      .join("") || "BM";
 
   const isLogin = pathname === "/admin/login";
 
@@ -212,7 +278,11 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
     return n.section === section;
   });
 
-  const crumbs = useMemo(() => buildBreadcrumbs(pathname, section, isMainAdmin), [pathname, section, isMainAdmin]);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const crumbs = useMemo(
+    () => buildBreadcrumbs(pathname, section, isMainAdmin),
+    [pathname, section, isMainAdmin],
+  );
 
   return (
     <Ctx.Provider value={ctxValue}>
@@ -273,7 +343,9 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
                 onClick={() => setCollapsed((v) => !v)}
                 className="rounded-full text-muted-foreground hover:text-foreground"
               >
-                <PanelLeftClose className={cn("size-4 transition-transform", collapsed && "rotate-180")} />
+                <PanelLeftClose
+                  className={cn("size-4 transition-transform", collapsed && "rotate-180")}
+                />
               </Button>
             </div>
             <div className="md:hidden">
@@ -290,7 +362,12 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
 
           <div className={cn("px-3 pt-3", collapsed && "px-2")}>
             {isMainAdmin ? (
-              <div className={cn("flex rounded-xl border border-border/70 bg-muted/30 p-1", collapsed && "flex-col")}>
+              <div
+                className={cn(
+                  "flex rounded-xl border border-border/70 bg-muted/30 p-1",
+                  collapsed && "flex-col",
+                )}
+              >
                 <NavSectionToggle
                   active={section === "branch"}
                   onClick={() => setSection("branch")}
@@ -312,7 +389,11 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
           <div className={cn("mt-4 flex w-full", collapsed && "justify-center")}>
             {!forcedBranch && branches.length > 0 ? (
               <div className={cn("w-full px-3", collapsed && "px-2")}>
-                <Select value={activeBranchId} onValueChange={(v) => setActiveBranchId(v)} disabled={Boolean(forcedBranch)}>
+                <Select
+                  value={activeBranchId}
+                  onValueChange={(v) => setActiveBranchId(v)}
+                  disabled={Boolean(forcedBranch)}
+                >
                   <SelectTrigger
                     className={cn(
                       "w-full rounded-xl border border-border/70 bg-background/70 shadow-sm",
@@ -329,7 +410,12 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
                         <Store className="size-4 text-primary shrink-0" />
                         <span className="flex min-w-0 flex-1 flex-col items-start leading-tight overflow-hidden">
                           <span className="truncate w-full text-left font-medium">
-                            {branch?.name ?? <SelectValue placeholder="Select branch" className="text-foreground" />}
+                            {branch?.name ?? (
+                              <SelectValue
+                                placeholder="Select branch"
+                                className="text-foreground"
+                              />
+                            )}
                           </span>
                           {branch?.city ? (
                             <span className="truncate w-full text-left text-[11px] text-muted-foreground">
@@ -346,7 +432,9 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
                       <SelectItem key={b.id} value={b.id} className="gap-2 py-2.5">
                         <div className="flex flex-col items-start leading-tight">
                           <span className="font-semibold">{b.name}</span>
-                          <span className="text-[11px] text-muted-foreground">{b.city} · {b.address.split(",")[0]}</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {b.city} · {b.address.split(",")[0]}
+                          </span>
                         </div>
                       </SelectItem>
                     ))}
@@ -357,10 +445,19 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
               <div className={cn("px-3", collapsed && "px-2")}>
                 <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/70 px-3 py-2 text-sm shadow-sm overflow-hidden">
                   <Store className="size-4 text-primary shrink-0" />
-                  <div className={cn("flex min-w-0 flex-1 flex-col items-start leading-tight overflow-hidden", collapsed && "hidden")}>
-                    <span className="truncate w-full text-left font-medium">{branch?.name ?? branches[0]?.name ?? "Branch"}</span>
+                  <div
+                    className={cn(
+                      "flex min-w-0 flex-1 flex-col items-start leading-tight overflow-hidden",
+                      collapsed && "hidden",
+                    )}
+                  >
+                    <span className="truncate w-full text-left font-medium">
+                      {branch?.name ?? branches[0]?.name ?? "Branch"}
+                    </span>
                     {branch?.city ? (
-                      <span className="truncate w-full text-left text-[11px] text-muted-foreground">{branch.city}</span>
+                      <span className="truncate w-full text-left text-[11px] text-muted-foreground">
+                        {branch.city}
+                      </span>
                     ) : null}
                   </div>
                 </div>
@@ -370,7 +467,9 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
 
           <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-2 pb-4">
             {visibleNav.map((n) => {
-              const active = pathname === n.to || (n.id === "dashboard" && (pathname === "/admin" || pathname === "/branch-manager"));
+              const active =
+                pathname === n.to ||
+                (n.id === "dashboard" && (pathname === "/admin" || pathname === "/branch-manager"));
               const linkTo = n.to;
               return (
                 <Link
@@ -396,10 +495,12 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
                   >
                     <n.icon className="size-4" />
                   </span>
-                  {!collapsed ? (
-                    <span className="flex-1 truncate">{n.label}</span>
+                  {!collapsed ? <span className="flex-1 truncate">{n.label}</span> : null}
+                  {!collapsed && n.badge ? (
+                    <Badge variant="outline" className="ml-auto rounded-full px-2 py-0 text-[10px]">
+                      {n.badge}
+                    </Badge>
                   ) : null}
-                  {!collapsed && n.badge ? <Badge variant="outline" className="ml-auto rounded-full px-2 py-0 text-[10px]">{n.badge}</Badge> : null}
                 </Link>
               );
             })}
@@ -426,13 +527,17 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
                   )}
                 >
                   <Avatar className={cn("size-9 ring-1 ring-border", collapsed && "size-8")}>
-                    <AvatarFallback className="bg-gradient-ember text-primary-foreground">{initials}</AvatarFallback>
+                    <AvatarFallback className="bg-gradient-ember text-primary-foreground">
+                      {initials}
+                    </AvatarFallback>
                   </Avatar>
                   {!collapsed ? (
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium leading-tight">{adminUser.name}</span>
+                      <span className="block truncate text-sm font-medium leading-tight">
+                        {adminUser.name}
+                      </span>
                       <span className="block truncate text-[11px] text-muted-foreground">
-                        {isMainAdmin ? "Main Admin" : branch?.name ?? "Branch Manager"}
+                        {isMainAdmin ? "Main Admin" : (branch?.name ?? "Branch Manager")}
                       </span>
                     </span>
                   ) : null}
@@ -443,19 +548,25 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
                 <DropdownMenuLabel>
                   <div className="text-sm font-medium">{adminUser.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    {isMainAdmin ? "Main Admin" : branch?.name ?? "Branch Manager"}
+                    {isMainAdmin ? "Main Admin" : (branch?.name ?? "Branch Manager")}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem onSelect={() => navigate({ to: isMainAdmin ? "/admin/settings" : "/branch-manager/settings" })}>
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      navigate({ to: isMainAdmin ? "/admin/settings" : "/branch-manager/settings" })
+                    }
+                  >
                     <UserIcon className="size-4" />
                     <span>Profile &amp; settings</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setSearchOpen(true)}>
                     <SearchIcon className="size-4" />
                     <span>Quick search</span>
-                    <span className="ml-auto rounded border border-border/70 bg-muted/40 px-1.5 text-[10px] text-muted-foreground">⌘K</span>
+                    <span className="ml-auto rounded border border-border/70 bg-muted/40 px-1.5 text-[10px] text-muted-foreground">
+                      ⌘K
+                    </span>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
@@ -490,14 +601,22 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
                 <BreadcrumbList>
                   <BreadcrumbItem>
                     <BreadcrumbLink asChild>
-                      <Link to={isMainAdmin ? "/admin" : "/branch-manager"} className="inline-flex items-center gap-1 text-muted-foreground">
+                      <Link
+                        to={isMainAdmin ? "/admin" : "/branch-manager"}
+                        className="inline-flex items-center gap-1 text-muted-foreground"
+                      >
                         <Home className="size-3.5" />
-                        {section === "chain" ? "Chain Console" : branch?.name ?? "Branch"}
+                        {section === "chain" ? "Chain Console" : (branch?.name ?? "Branch")}
                       </Link>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
                   {crumbs.map((c, i) => (
-                    <FragmentBreadcrumb key={c.label + i} crumb={c} index={i} total={crumbs.length} />
+                    <FragmentBreadcrumb
+                      key={c.label + i}
+                      crumb={c}
+                      index={i}
+                      total={crumbs.length}
+                    />
                   ))}
                 </BreadcrumbList>
               </Breadcrumb>
@@ -529,10 +648,19 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
                   ⌘K
                 </span>
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)} className="rounded-full md:hidden">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSearchOpen(true)}
+                className="rounded-full md:hidden"
+              >
                 <SearchIcon className="size-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="relative rounded-full text-muted-foreground hover:text-foreground">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative rounded-full text-muted-foreground hover:text-foreground"
+              >
                 <Bell className="size-5" />
                 <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-gradient-ember shadow-sm" />
                 <span className="sr-only">Notifications</span>
@@ -677,7 +805,9 @@ function FragmentBreadcrumb({
           <BreadcrumbPage className="text-sm">{crumb.label}</BreadcrumbPage>
         ) : (
           <BreadcrumbLink asChild>
-            <Link to={crumb.to} className="text-sm">{crumb.label}</Link>
+            <Link to={crumb.to} className="text-sm">
+              {crumb.label}
+            </Link>
           </BreadcrumbLink>
         )}
       </BreadcrumbItem>
@@ -693,7 +823,10 @@ function buildBreadcrumbs(
   const prefix = pathname.startsWith("/branch-manager") ? "/branch-manager" : "/admin";
   const P = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const map: Array<{ test: RegExp; label: string; to?: string }> = [
-    { test: new RegExp(`^${P}\\/?$`), label: section === "chain" && isMainAdmin ? "Overview" : "Dashboard" },
+    {
+      test: new RegExp(`^${P}\\/?$`),
+      label: section === "chain" && isMainAdmin ? "Overview" : "Dashboard",
+    },
     { test: new RegExp(`^${P}\\/overview$`), label: "Chain Overview" },
     { test: new RegExp(`^${P}\\/branches$`), label: "Branches", to: `${prefix}/branches` },
     { test: new RegExp(`^${P}\\/menu$`), label: "Menu Editor" },
@@ -713,4 +846,3 @@ function buildBreadcrumbs(
   }
   return [{ label: "Branch Manager" }];
 }
-

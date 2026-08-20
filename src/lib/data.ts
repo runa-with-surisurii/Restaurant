@@ -97,7 +97,8 @@ export const dishes: Dish[] = [
   {
     id: "smoked-bacon-burger",
     name: "Smoked Bacon Ember Burger",
-    description: "Charred wagyu patty, applewood bacon, aged cheddar, ember aioli on a brioche bun.",
+    description:
+      "Charred wagyu patty, applewood bacon, aged cheddar, ember aioli on a brioche bun.",
     price: 16.5,
     image: burger,
     categoryId: "burgers",
@@ -198,16 +199,48 @@ export const dishes: Dish[] = [
 ];
 
 export const branches: Branch[] = [
-  { id: "downtown", name: "Downtown Flagship", address: "48 Oak Lane", city: "New York, NY", phone: "(212) 555-0148", hours: "11:00 – 23:00" },
-  { id: "harbor", name: "Harbor Grill", address: "12 Pier Road", city: "Boston, MA", phone: "(617) 555-0122", hours: "12:00 – 22:30" },
+  {
+    id: "downtown",
+    name: "Downtown Flagship",
+    address: "48 Oak Lane",
+    city: "New York, NY",
+    phone: "(212) 555-0148",
+    hours: "11:00 – 23:00",
+  },
+  {
+    id: "harbor",
+    name: "Harbor Grill",
+    address: "12 Pier Road",
+    city: "Boston, MA",
+    phone: "(617) 555-0122",
+    hours: "12:00 – 22:30",
+  },
   { id: "westside", name: "Westside Kitchen", address: "301 Sunset Blvd", city: "Los Angeles, CA", phone: "(310) 555-0181", hours: "11:30 – 00:00" },
   { id: "riverfront", name: "Riverfront Roast", address: "77 Riverwalk", city: "Chicago, IL", phone: "(312) 555-0106", hours: "11:00 – 23:00" },
 ];
 
 export const promotions: Promotion[] = [
-  { id: "p1", title: "Family Feast Friday", description: "20% off orders over $60 every Friday night.", code: "FEAST20", discount: "20% off" },
-  { id: "p2", title: "First-Order Ember", description: "$10 off your first order — welcome to the fire.", code: "FIRST10", discount: "$10 off" },
-  { id: "p3", title: "Weekday Lunch Combo", description: "Any pasta or salad + drink for $15, Mon–Thu 11–3.", code: "LUNCH15", discount: "Combo $15" },
+  {
+    id: "p1",
+    title: "Family Feast Friday",
+    description: "20% off orders over $60 every Friday night.",
+    code: "FEAST20",
+    discount: "20% off",
+  },
+  {
+    id: "p2",
+    title: "First-Order Ember",
+    description: "$10 off your first order — welcome to the fire.",
+    code: "FIRST10",
+    discount: "$10 off",
+  },
+  {
+    id: "p3",
+    title: "Weekday Lunch Combo",
+    description: "Any pasta or salad + drink for $15, Mon–Thu 11–3.",
+    code: "LUNCH15",
+    discount: "Combo $15",
+  },
 ];
 
 // Shared floor-plan template applied to every branch. Coordinates on a 100 x 60 grid.

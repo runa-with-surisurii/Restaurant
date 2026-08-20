@@ -1,43 +1,253 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { MapPin, Phone, Clock } from "lucide-react";
-import { SiteLayout } from "@/components/site-layout";
-import { branches } from "@/lib/data";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { useStore } from "@/lib/store";
+
 
 export const Route = createFileRoute("/branches")({
-  head: () => ({
-    meta: [
-      { title: "Our branches — Ember & Oak" },
-      { name: "description", content: "Find your nearest Ember & Oak fire-kitchen — four locations across the U.S." },
-      { property: "og:title", content: "Our branches — Ember & Oak" },
-      { property: "og:description", content: "Find your nearest Ember & Oak fire-kitchen — four locations across the U.S." },
-    ],
-  }),
-  component: BranchesPage,
+  component: BranchPage,
 });
 
-function BranchesPage() {
+
+
+type Branch = {
+  storeNumber:number;
+  city:string;
+  state:string;
+  region:string;
+  type?:string;
+  loyalty?:string;
+};
+
+
+
+function BranchPage(){
+
+  const navigate = useNavigate();
+
+
+  const {
+    adminUser,
+    currentRole
+  } = useStore();
+
+
+
+  const [branch,setBranch] = useState<Branch | null>(null);
+
+  const [loading,setLoading] = useState(true);
+
+
+
+
+  useEffect(()=>{
+
+
+    if(!adminUser){
+
+      navigate({
+        to:"/login",
+        replace:true
+      });
+
+      return;
+
+    }
+
+
+
+    if(currentRole !== "branch_manager"){
+
+      navigate({
+        to:"/admin",
+        replace:true
+      });
+
+      return;
+
+    }
+
+
+
+    fetch(
+      "http://127.0.0.1:8000/api/branches"
+    )
+
+
+    .then(res=>res.json())
+
+
+    .then(data=>{
+
+
+      console.log("USER:",adminUser);
+
+      console.log("BRANCH API:",data);
+
+
+
+      const currentBranch =
+        data.find(
+          (b:Branch)=>
+            String(b.storeNumber) ===
+            String(adminUser.branchId)
+        );
+
+
+
+      console.log(
+        "FOUND BRANCH:",
+        currentBranch
+      );
+
+
+
+      setBranch(currentBranch || null);
+
+
+    })
+
+
+    .catch(err=>{
+
+      console.log(err);
+
+    })
+
+
+    .finally(()=>{
+
+      setLoading(false);
+
+    });
+
+
+
+  },[
+    adminUser,
+    currentRole,
+    navigate
+  ]);
+
+
+
+
+
+
+  if(loading){
+
+    return (
+
+      <div className="
+      min-h-screen
+      grid
+      place-items-center
+      ">
+
+        Loading Branch Dashboard...
+
+      </div>
+
+    );
+
+  }
+
+
+
+
+
+
   return (
-    <SiteLayout>
-      <section className="border-b border-border bg-muted/40">
-        <div className="mx-auto max-w-7xl px-4 py-12 md:px-6">
-          <h1 className="font-display text-5xl md:text-6xl">Our branches</h1>
-          <p className="mt-2 max-w-xl text-muted-foreground">Four fire-kitchens, one philosophy. Drop by any time — we're open late.</p>
+
+    <div className="
+    min-h-screen
+    bg-muted/30
+    p-8
+    ">
+
+
+      <h1 className="
+      text-4xl
+      font-bold
+      ">
+
+        BRANCH DASHBOARD
+
+      </h1>
+
+
+
+
+
+      <div className="
+      mt-6
+      rounded-xl
+      border
+      bg-card
+      p-6
+      ">
+
+
+
+        <h2 className="
+        text-2xl
+        font-semibold
+        ">
+
+          {branch?.city || "Unknown Branch"}
+
+        </h2>
+
+
+
+        <div className="
+        mt-3
+        space-y-2
+        text-muted-foreground
+        ">
+
+
+          <p>
+            State:
+            {" "}
+            {branch?.state || "-"}
+          </p>
+
+
+
+          <p>
+            Region:
+            {" "}
+            {branch?.region || "-"}
+          </p>
+
+
+
+
+          <p>
+            Manager:
+            {" "}
+            {adminUser?.name}
+          </p>
+
+
+
+          <p>
+            Branch ID:
+            {" "}
+            {adminUser?.branchId}
+          </p>
+
+
+
         </div>
-      </section>
-      <section className="mx-auto max-w-7xl px-4 py-10 md:px-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          {branches.map((b) => (
-            <article key={b.id} className="rounded-2xl border border-border bg-card p-6 shadow-elegant">
-              <h2 className="font-display text-3xl">{b.name}</h2>
-              <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2"><MapPin className="size-4 text-primary" /> {b.address}, {b.city}</li>
-                <li className="flex items-center gap-2"><Phone className="size-4 text-primary" /> {b.phone}</li>
-                <li className="flex items-center gap-2"><Clock className="size-4 text-primary" /> Open {b.hours}</li>
-              </ul>
-            </article>
-          ))}
-        </div>
-      </section>
-    </SiteLayout>
+
+
+
+      </div>
+
+
+    </div>
+
   );
+
 }

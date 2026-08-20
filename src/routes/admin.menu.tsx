@@ -5,9 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -15,7 +26,9 @@ import { categories, type Dish } from "@/lib/data";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/menu")({
-  head: () => ({ meta: [{ title: "Menu Editor — Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({
+    meta: [{ title: "Menu Editor — Admin" }, { name: "robots", content: "noindex" }],
+  }),
   component: MenuAdmin,
 });
 
@@ -50,9 +63,18 @@ function MenuAdmin() {
           <h1 className="font-display text-3xl tracking-wide md:text-4xl">Menu Editor</h1>
           <p className="text-sm text-muted-foreground">Chain-wide dish catalog.</p>
         </div>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditing(null); }}>
+        <Dialog
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(v);
+            if (!v) setEditing(null);
+          }}
+        >
           <DialogTrigger asChild>
-            <Button className="gap-2"><Plus className="size-4" />Add dish</Button>
+            <Button className="gap-2">
+              <Plus className="size-4" />
+              Add dish
+            </Button>
           </DialogTrigger>
           <DishDialog
             editing={editing}
@@ -84,7 +106,9 @@ function MenuAdmin() {
                 src={d.image}
                 alt={d.name}
                 className="size-20 shrink-0 rounded-md object-cover"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
+                }}
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
@@ -96,7 +120,14 @@ function MenuAdmin() {
                 </div>
                 <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{d.description}</p>
                 <div className="mt-2 flex gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => { setEditing(d); setOpen(true); }}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditing(d);
+                      setOpen(true);
+                    }}
+                  >
                     <Pencil className="size-4" />
                   </Button>
                   <Button
@@ -121,15 +152,11 @@ function MenuAdmin() {
   );
 }
 
-function DishDialog({
-  editing,
-  onSubmit,
-}: {
-  editing: Dish | null;
-  onSubmit: (d: Dish) => void;
-}) {
+function DishDialog({ editing, onSubmit }: { editing: Dish | null; onSubmit: (d: Dish) => void }) {
   const [form, setForm] = useState<Dish>(editing ?? empty());
-  useEffect(() => { setForm(editing ?? empty()); }, [editing]);
+  useEffect(() => {
+    setForm(editing ?? empty());
+  }, [editing]);
   const set = <K extends keyof Dish>(k: K, v: Dish[K]) => setForm({ ...form, [k]: v });
 
   return (
@@ -150,17 +177,23 @@ function DishDialog({
           <div className="space-y-1">
             <Label>Price ($)</Label>
             <Input
-              type="number" step="0.5" value={form.price}
+              type="number"
+              step="0.5"
+              value={form.price}
               onChange={(e) => set("price", Number(e.target.value))}
             />
           </div>
           <div className="space-y-1">
             <Label>Category</Label>
             <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.emoji} {c.name}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.emoji} {c.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -168,28 +201,52 @@ function DishDialog({
         </div>
         <div className="space-y-1">
           <Label>Image URL</Label>
-          <Input value={form.image} onChange={(e) => set("image", e.target.value)} placeholder="https://..." />
+          <Input
+            value={form.image}
+            onChange={(e) => set("image", e.target.value)}
+            placeholder="https://..."
+          />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label>Prep time (min)</Label>
-            <Input type="number" value={form.prepTime} onChange={(e) => set("prepTime", Number(e.target.value))} />
+            <Input
+              type="number"
+              value={form.prepTime}
+              onChange={(e) => set("prepTime", Number(e.target.value))}
+            />
           </div>
           <div className="space-y-1">
             <Label>Calories</Label>
-            <Input type="number" value={form.calories} onChange={(e) => set("calories", Number(e.target.value))} />
+            <Input
+              type="number"
+              value={form.calories}
+              onChange={(e) => set("calories", Number(e.target.value))}
+            />
           </div>
         </div>
         <div className="space-y-1">
           <Label>Tags (comma-separated)</Label>
           <Input
             value={form.tags.join(", ")}
-            onChange={(e) => set("tags", e.target.value.split(",").map((t) => t.trim()).filter(Boolean))}
+            onChange={(e) =>
+              set(
+                "tags",
+                e.target.value
+                  .split(",")
+                  .map((t) => t.trim())
+                  .filter(Boolean),
+              )
+            }
           />
         </div>
       </div>
       <DialogFooter>
-        <Button onClick={() => { if (form.name) onSubmit(form); }}>
+        <Button
+          onClick={() => {
+            if (form.name) onSubmit(form);
+          }}
+        >
           {editing ? "Save" : "Add dish"}
         </Button>
       </DialogFooter>

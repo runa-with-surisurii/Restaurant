@@ -1,31 +1,73 @@
-import type { AuthRole } from "@/lib/store";
+export type UserRole = "main_admin" | "branch_manager" | "customer";
 
-export const AUTH_ENTRY_ROUTES = ["/login", "/register", "/portal", "/admin/login"] as const;
+export type AuthUser = {
 
-export function isAuthEntryRoute(pathname: string) {
-  return AUTH_ENTRY_ROUTES.includes(pathname as (typeof AUTH_ENTRY_ROUTES)[number]);
-}
+  id: string;
 
-export function defaultRouteForRole(role: AuthRole | null) {
-  if (role === "main_admin") return "/admin" as const;
-  if (role === "branch_manager") return "/branch-dashboard" as const;
-  return "/" as const;
-}
+  name: string;
 
-export function getUnauthorizedRedirect(role: AuthRole | null, pathname: string) {
-  if (!role) return "/login" as const;
+  email: string;
 
-  const isAdminRoute = pathname.startsWith("/admin");
-  const isBranchRoute =
-    pathname.startsWith("/branch-manager") || pathname.startsWith("/branch-dashboard");
+  role: UserRole;
 
-  if (role === "customer" && (isAdminRoute || isBranchRoute)) {
-    return "/login" as const;
+  branchId?: string;
+
+};
+
+export function defaultRouteForRole(role?: UserRole | string | null) {
+  switch (role) {
+    case "main_admin":
+      return "/admin";
+
+
+    case "branch_manager":
+      return "/branch-manager";
+
+    case "customer":
+       return "/menu";
+
+    default:
+      return "/login";
+
   }
 
-  if (role === "branch_manager" && isAdminRoute) {
-    return "/branch-dashboard" as const;
+}
+
+export function getUnauthorizedRedirect(role?: UserRole | string | null, pathname?: string) {
+  if (!role) {
+
+    return "/login";
+ }
+
+
+
+  if (pathname?.startsWith("/admin")) {
+    if (role !== "main_admin") {
+      return "/";
+
+    }
+
   }
+
+
+
+
+  if (pathname?.startsWith("/branch-manager")) {
+    if (role !== "branch_manager") {
+
+      return "/";
+
+    }
+
+  }
+
+
 
   return null;
+
+}
+
+export function isAuthEntryRoute(pathname: string) {
+  return pathname === "/login" || pathname === "/signup" || pathname === "/register";
+
 }

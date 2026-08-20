@@ -41,6 +41,8 @@ export type AdminUser = {
   name: string;
   role: AdminRole;
   branchId?: string; // required for branch_manager
+  branchName?:string;
+  username?:string;
 };
 
 export type BookingStatus = "confirmed" | "seated" | "completed" | "cancelled";
@@ -91,7 +93,7 @@ type Store = {
   user: User | null;
   currentRole: AuthRole | null;
   isAuthenticated: boolean;
-  authenticate: (identifier: string, password: string) => AuthRole;
+  authenticate: (identifier: string, password: string) => Promise<AuthRole>;
   signUpCustomer: (payload: {
     name: string;
     email: string;
@@ -178,22 +180,137 @@ type Persisted = {
 };
 
 const STAFF_CREDENTIALS = [
-  { username: "admin", password: "mainadmin", role: "main_admin" as const, name: "Main Admin" },
-  { username: "branch1", password: "b1", role: "branch_manager" as const, branchId: seedBranches[0]?.id, name: `Manager · ${seedBranches[0]?.name ?? "Branch 1"}` },
-  { username: "branch2", password: "b2", role: "branch_manager" as const, branchId: seedBranches[1]?.id, name: `Manager · ${seedBranches[1]?.name ?? "Branch 2"}` },
-  { username: "branch3", password: "b3", role: "branch_manager" as const, branchId: seedBranches[2]?.id, name: `Manager · ${seedBranches[2]?.name ?? "Branch 3"}` },
-  { username: "branch4", password: "b4", role: "branch_manager" as const, branchId: seedBranches[3]?.id, name: `Manager · ${seedBranches[3]?.name ?? "Branch 4"}` },
-];
+  {
+    username: "admin",
+    password: "mainadmin",
+    role: "main_admin" as const,
+    name: "Main Admin",
+  },
 
+  {
+    username: "branch1",
+    password: "b1",
+    role: "branch_manager" as const,
+    branchId: "46673",
+    name: "Berkeley Branch Manager",
+  },
+
+  {
+    username: "branch2",
+    password: "b2",
+    role: "branch_manager" as const,
+    branchId: "4904",
+    name: "Shattuck Branch Manager",
+  },
+
+  {
+    username: "branch3",
+    password: "b3",
+    role: "branch_manager" as const,
+    branchId: "12631",
+    name: "Ridgewood Branch Manager",
+  },
+
+  {
+    username: "branch4",
+    password: "b4",
+    role: "branch_manager" as const,
+    branchId: "20974",
+    name: "Elmhurst Branch Manager",
+  },
+];
 const seededReviews: Review[] = [
-  { id: "r1", branchId: "br-westside", rating: 5, author: "Sofia M.", title: "Our date-night go-to", body: "The smoked ribeye at Westside is legendary. Our server remembered our anniversary — felt so special. Will be back.", sentiment: "positive", approved: true, createdAt: new Date(Date.now()-864e5*3).toISOString() },
-  { id: "r2", branchId: "br-downtown", rating: 4, author: "Jordan P.", title: "Great lunch menu", body: "Downtown location is perfect for work lunches. Only small issue — wait for the table was 20 min past booking. Otherwise 10/10.", sentiment: "positive", approved: true, createdAt: new Date(Date.now()-864e5*6).toISOString() },
-  { id: "r3", branchId: "br-harbor", rating: 3, author: "Taylor R.", title: "Good but inconsistent", body: "Harbor's fire-roasted veggies arrived cold. Otherwise flavor was solid, and the harbor view is unbeatable.", sentiment: "neutral", approved: false, createdAt: new Date(Date.now()-864e5*2).toISOString() },
-  { id: "r4", branchId: "br-westside", rating: 2, author: "Alex K.", title: "Long wait, forgotten order", body: "Westside was understaffed this Saturday. Waited 45 min, sides came out wrong. Manager handled it well though.", sentiment: "negative", approved: false, createdAt: new Date(Date.now()-864e5*1).toISOString() },
-  { id: "r5", branchId: "br-downtown", rating: 5, author: "Priya S.", title: "Chef's tasting menu 👌", body: "Downtown chef's tasting — every course was a hit. The bone-marrow risotto changed my life. Recommend to anyone.", sentiment: "positive", approved: true, createdAt: new Date(Date.now()-864e5*10).toISOString(), reply: "Hi Priya! Thrilled you enjoyed the tasting menu. Come back this month — the new summer menu is dropping and we'd love to hear what you think.", repliedAt: new Date(Date.now()-864e5*9).toISOString() },
-  { id: "r6", branchId: "br-uptown", rating: 4, author: "Morgan L.", title: "Uptown is such a vibe", body: "Cozy interior, friendly staff. The oak-barrel old fashioned is a must. Will bring friends.", sentiment: "positive", approved: true, createdAt: new Date(Date.now()-864e5*4).toISOString() },
-  { id: "r7", branchId: "br-harbor", rating: 5, author: "Samir V.", title: "Waterfront + ribs", body: "Harbor waterfront table + short ribs = best birthday ever. They gave us a complimentary chocolate ember — class act.", sentiment: "positive", approved: true, createdAt: new Date(Date.now()-864e5*7).toISOString() },
-  { id: "r8", branchId: "br-uptown", rating: 2, author: "Chris D.", title: "Wait staff seemed rushed", body: "Uptown seemed understaffed tonight. Felt like they wanted us out quickly. Food great as always though.", sentiment: "negative", approved: false, createdAt: new Date(Date.now()-864e5*1).toISOString() },
+  {
+    id: "r1",
+    branchId: "br-westside",
+    rating: 5,
+    author: "Sofia M.",
+    title: "Our date-night go-to",
+    body: "The smoked ribeye at Westside is legendary. Our server remembered our anniversary — felt so special. Will be back.",
+    sentiment: "positive",
+    approved: true,
+    createdAt: new Date(Date.now() - 864e5 * 3).toISOString(),
+  },
+  {
+    id: "r2",
+    branchId: "br-downtown",
+    rating: 4,
+    author: "Jordan P.",
+    title: "Great lunch menu",
+    body: "Downtown location is perfect for work lunches. Only small issue — wait for the table was 20 min past booking. Otherwise 10/10.",
+    sentiment: "positive",
+    approved: true,
+    createdAt: new Date(Date.now() - 864e5 * 6).toISOString(),
+  },
+  {
+    id: "r3",
+    branchId: "br-harbor",
+    rating: 3,
+    author: "Taylor R.",
+    title: "Good but inconsistent",
+    body: "Harbor's fire-roasted veggies arrived cold. Otherwise flavor was solid, and the harbor view is unbeatable.",
+    sentiment: "neutral",
+    approved: false,
+    createdAt: new Date(Date.now() - 864e5 * 2).toISOString(),
+  },
+  {
+    id: "r4",
+    branchId: "br-westside",
+    rating: 2,
+    author: "Alex K.",
+    title: "Long wait, forgotten order",
+    body: "Westside was understaffed this Saturday. Waited 45 min, sides came out wrong. Manager handled it well though.",
+    sentiment: "negative",
+    approved: false,
+    createdAt: new Date(Date.now() - 864e5 * 1).toISOString(),
+  },
+  {
+    id: "r5",
+    branchId: "br-downtown",
+    rating: 5,
+    author: "Priya S.",
+    title: "Chef's tasting menu 👌",
+    body: "Downtown chef's tasting — every course was a hit. The bone-marrow risotto changed my life. Recommend to anyone.",
+    sentiment: "positive",
+    approved: true,
+    createdAt: new Date(Date.now() - 864e5 * 10).toISOString(),
+    reply:
+      "Hi Priya! Thrilled you enjoyed the tasting menu. Come back this month — the new summer menu is dropping and we'd love to hear what you think.",
+    repliedAt: new Date(Date.now() - 864e5 * 9).toISOString(),
+  },
+  {
+    id: "r6",
+    branchId: "br-uptown",
+    rating: 4,
+    author: "Morgan L.",
+    title: "Uptown is such a vibe",
+    body: "Cozy interior, friendly staff. The oak-barrel old fashioned is a must. Will bring friends.",
+    sentiment: "positive",
+    approved: true,
+    createdAt: new Date(Date.now() - 864e5 * 4).toISOString(),
+  },
+  {
+    id: "r7",
+    branchId: "br-harbor",
+    rating: 5,
+    author: "Samir V.",
+    title: "Waterfront + ribs",
+    body: "Harbor waterfront table + short ribs = best birthday ever. They gave us a complimentary chocolate ember — class act.",
+    sentiment: "positive",
+    approved: true,
+    createdAt: new Date(Date.now() - 864e5 * 7).toISOString(),
+  },
+  {
+    id: "r8",
+    branchId: "br-uptown",
+    rating: 2,
+    author: "Chris D.",
+    title: "Wait staff seemed rushed",
+    body: "Uptown seemed understaffed tonight. Felt like they wanted us out quickly. Food great as always though.",
+    sentiment: "negative",
+    approved: false,
+    createdAt: new Date(Date.now() - 864e5 * 1).toISOString(),
+  },
 ];
 
 const initial = (): Persisted => ({
@@ -232,7 +349,8 @@ const load = (): Persisted => {
       branchesState: parsed.branchesState?.length ? parsed.branchesState : base.branchesState,
       dishesState: parsed.dishesState?.length ? parsed.dishesState : base.dishesState,
       availability: parsed.availability ?? base.availability,
-      reviews: Array.isArray(parsed.reviews) && parsed.reviews.length ? parsed.reviews : base.reviews,
+      reviews:
+        Array.isArray(parsed.reviews) && parsed.reviews.length ? parsed.reviews : base.reviews,
       branchMenu: parsed.branchMenu ?? base.branchMenu,
     };
   } catch {
@@ -366,42 +484,58 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       user: state.user,
       currentRole,
       isAuthenticated: Boolean(state.user || state.adminUser),
-      authenticate: (identifier, password) => {
-        const normalized = identifier.trim().toLowerCase();
-        const staff = STAFF_CREDENTIALS.find(
-          (entry) => entry.username === normalized && entry.password === password,
-        );
+      authenticate: async (identifier, password) => {
+        const response = await fetch("http://127.0.0.1:8000/api/login", {
+          method: "POST",
 
-        if (staff) {
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            username: identifier,
+            password: password,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.message || "Login failed");
+        }
+
+        const user = data.user;
+        if (user.role === "main_admin" || user.role === "branch_manager") {
           patch({
             user: null,
+
             adminUser: {
-              name: staff.name,
-              role: staff.role,
-              branchId: staff.role === "branch_manager" ? staff.branchId : undefined,
+              name: user.name,
+
+              role: user.role,
+
+              branchId: user.branchId,
             },
           });
-          return staff.role;
+
+          return user.role;
+        } else {
+          patch({
+            adminUser: null,
+
+            user: {
+              id: user._id,
+
+              name: user.name,
+
+              email: user.username,
+
+              phone: user.phone,
+            },
+          });
+
+          return "customer";
         }
-
-        const customer = state.customerAccounts.find(
-          (entry) => entry.email.toLowerCase() === normalized && entry.password === password,
-        );
-
-        if (!customer) {
-          throw new Error("Invalid username/email or password.");
-        }
-
-        patch({
-          adminUser: null,
-          user: {
-            id: customer.id,
-            name: customer.name,
-            email: customer.email,
-            phone: customer.phone,
-          },
-        });
-        return "customer";
       },
       signUpCustomer: ({ name, email, phone, password }) => {
         const normalizedEmail = email.trim().toLowerCase();
@@ -470,8 +604,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })),
 
       dishesState: state.dishesState,
-      addDish: (d) =>
-        setState((prev) => ({ ...prev, dishesState: [...prev.dishesState, d] })),
+      addDish: (d) => setState((prev) => ({ ...prev, dishesState: [...prev.dishesState, d] })),
       updateDish: (id, p) =>
         setState((prev) => ({
           ...prev,
@@ -500,7 +633,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       reviews: state.reviews,
       submitReview: (r) => {
-        const sentiment: ReviewSentiment = r.rating >= 4 ? "positive" : r.rating <= 2 ? "negative" : "neutral";
+        const sentiment: ReviewSentiment =
+          r.rating >= 4 ? "positive" : r.rating <= 2 ? "negative" : "neutral";
         const review: Review = {
           ...r,
           id: `RV-${Date.now().toString(36).toUpperCase()}`,
@@ -527,7 +661,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       branchMenu: state.branchMenu,
       addBranchSpecial: (branchId, d) =>
         setState((prev) => {
-          const bm = prev.branchMenu[branchId] ?? { specials: [], hiddenChain: [], priceOverrides: {} };
+          const bm = prev.branchMenu[branchId] ?? {
+            specials: [],
+            hiddenChain: [],
+            priceOverrides: {},
+          };
           const id = d.id ?? `sp-${Date.now().toString(36)}`;
           return {
             ...prev,
@@ -545,7 +683,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...prev,
             branchMenu: {
               ...prev.branchMenu,
-              [branchId]: { ...bm, specials: bm.specials.map((x) => (x.id === id ? { ...x, ...patch } : x)) },
+              [branchId]: {
+                ...bm,
+                specials: bm.specials.map((x) => (x.id === id ? { ...x, ...patch } : x)),
+              },
             },
           };
         }),
@@ -563,7 +704,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }),
       hideChainDish: (branchId, dishId) =>
         setState((prev) => {
-          const bm = prev.branchMenu[branchId] ?? { specials: [], hiddenChain: [], priceOverrides: {} };
+          const bm = prev.branchMenu[branchId] ?? {
+            specials: [],
+            hiddenChain: [],
+            priceOverrides: {},
+          };
           if (bm.hiddenChain.includes(dishId)) return prev;
           return {
             ...prev,
@@ -587,7 +732,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }),
       overridePrice: (branchId, dishId, price) =>
         setState((prev) => {
-          const bm = prev.branchMenu[branchId] ?? { specials: [], hiddenChain: [], priceOverrides: {} };
+          const bm = prev.branchMenu[branchId] ?? {
+            specials: [],
+            hiddenChain: [],
+            priceOverrides: {},
+          };
           return {
             ...prev,
             branchMenu: {

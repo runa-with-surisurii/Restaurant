@@ -1,177 +1,670 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Minus, Plus, Trash2, ShoppingBag, Package, CalendarCheck, UtensilsCrossed } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Minus, Plus, ShoppingBag, Trash2, ArrowLeft } from "lucide-react";
 import { SiteLayout } from "@/components/site-layout";
-import { useStore } from "@/lib/store";
-import { getDish, branches } from "@/lib/data";
+import { useCart } from "@/lib/cart";
 
 export const Route = createFileRoute("/cart")({
-  head: () => ({ meta: [{ title: "Your cart — Ember & Oak" }, { name: "robots", content: "noindex" }] }),
+
+  head: () => ({
+    meta: [
+      {
+        title: "Your Order — Ember & Oak",
+      },
+    ],
+  }),
+
   component: CartPage,
+
 });
 
-function CartPage() {
-  const { cart, setQty, removeFromCart, cartSubtotal, clearCart } = useStore();
-  const { bookings } = useStore();
-  const navigate = useNavigate();
-  const upcoming = useMemo(
-    () => bookings.filter((b) => b.status === "confirmed" || b.status === "seated"),
-    [bookings],
-  );
-  type Mode = "pickup" | "booking_only" | "booking_preorder";
-  const [mode, setMode] = useState<Mode>("pickup");
-  const [branchId, setBranchId] = useState(branches[0].id);
-  const tax = cartSubtotal * 0.08;
-  const total = cartSubtotal + tax;
+function CartPage(){
+  const {
+    items,
 
-  const continueFlow = () => {
-    if (mode === "pickup") {
-      navigate({ to: "/checkout", search: { mode: "dine_in" as const, branchId } });
-    } else if (mode === "booking_only") {
-      navigate({ to: "/book" });
-    } else {
-      navigate({ to: "/book", search: { preorder: 1 } });
-    }
-  };
+increase,
 
-  return (
-    <SiteLayout>
-      <div className="mx-auto max-w-6xl px-4 py-12 md:px-6">
-        <h1 className="font-display text-5xl">Your cart</h1>
+decrease,
 
-        {cart.length === 0 ? (
-          <div className="mt-10 grid place-items-center rounded-3xl border border-dashed border-border bg-muted/30 py-20 text-center">
-            <ShoppingBag className="size-10 text-muted-foreground" />
-            <p className="mt-4 text-muted-foreground">Your cart is empty.</p>
-            <Link to="/menu" className="mt-6 inline-flex rounded-full bg-gradient-ember px-6 py-3 font-semibold text-primary-foreground">
-              Browse the menu
-            </Link>
-          </div>
-        ) : (
-          <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]">
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">How do you want this?</div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                  <ModeCard
-                    active={mode === "pickup"}
-                    onClick={() => setMode("pickup")}
-                    icon={<Package className="size-5 text-primary" />}
-                    title="Pickup (parcel)"
-                    desc="Takeaway — collect at the counter."
-                  />
-                  <ModeCard
-                    active={mode === "booking_only"}
-                    onClick={() => setMode("booking_only")}
-                    icon={<CalendarCheck className="size-5 text-primary" />}
-                    title="Booking only"
-                    desc="Reserve a table, order later."
-                  />
-                  <ModeCard
-                    active={mode === "booking_preorder"}
-                    onClick={() => setMode("booking_preorder")}
-                    icon={<UtensilsCrossed className="size-5 text-primary" />}
-                    title="Booking + pre-order"
-                    desc="Reserve a table & pre-order this cart."
-                  />
-                </div>
-                {mode === "pickup" && (
-                  <label className="mt-3 block">
-                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pickup branch</span>
-                    <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm">
-                      {branches.map((b) => <option key={b.id} value={b.id}>{b.name} — {b.city}</option>)}
-                    </select>
-                  </label>
-                )}
-                {mode === "booking_only" && (
-                  <p className="mt-3 rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground">
-                    You'll pick a branch, time and table next. Your cart stays saved for later.
-                  </p>
-                )}
-                {mode === "booking_preorder" && (
-                  <p className="mt-3 rounded-xl bg-primary/5 p-3 text-xs text-foreground">
-                    We'll attach these {cart.reduce((s, i) => s + i.qty, 0)} item(s) to your booking so the kitchen preps ahead. You'll pay when seated.
-                  </p>
-                )}
-              </div>
+removeItem,
 
-              {cart.map((item) => {
-                const d = getDish(item.dishId);
-                if (!d) return null;
-                return (
-                  <div key={item.dishId} className="flex gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
-                    <img src={d.image} alt={d.name} className="size-24 shrink-0 rounded-xl object-cover" />
-                    <div className="flex flex-1 flex-col">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 className="font-display text-lg">{d.name}</h3>
-                          <p className="text-sm text-muted-foreground">${d.price.toFixed(2)} each</p>
-                        </div>
-                        <button onClick={() => removeFromCart(item.dishId)} aria-label="Remove" className="text-muted-foreground hover:text-destructive">
-                          <Trash2 className="size-4" />
-                        </button>
-                      </div>
-                      <div className="mt-auto flex items-center justify-between">
-                        <div className="inline-flex items-center rounded-full border border-border">
-                          <button onClick={() => setQty(item.dishId, item.qty - 1)} className="grid size-9 place-items-center hover:text-primary"><Minus className="size-3.5" /></button>
-                          <span className="w-8 text-center text-sm font-semibold">{item.qty}</span>
-                          <button onClick={() => setQty(item.dishId, item.qty + 1)} className="grid size-9 place-items-center hover:text-primary"><Plus className="size-3.5" /></button>
-                        </div>
-                        <span className="font-display text-lg text-primary">${(d.price * item.qty).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              <button onClick={clearCart} className="text-sm text-muted-foreground hover:text-destructive">Clear cart</button>
-            </div>
+clearCart,
 
-            <aside className="h-fit rounded-2xl border border-border bg-card p-6 shadow-elegant">
-              <h2 className="font-display text-2xl">Summary</h2>
-              <dl className="mt-4 space-y-2 text-sm">
-                <Row label="Subtotal" value={`$${cartSubtotal.toFixed(2)}`} />
-                <Row label="Tax (8%)" value={`$${tax.toFixed(2)}`} />
-              </dl>
-              <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-                <span className="font-display text-lg">Total</span>
-                <span className="font-display text-2xl text-primary">${total.toFixed(2)}</span>
-              </div>
-              <button
-                type="button"
-                onClick={continueFlow}
-                className="mt-6 block w-full rounded-full bg-gradient-ember py-3 text-center font-semibold text-primary-foreground shadow-ember hover:scale-[1.01]"
-              >
-                {mode === "pickup" ? "Checkout" : mode === "booking_only" ? "Book a table" : "Book & pre-order"}
-              </button>
-            </aside>
-          </div>
-        )}
-      </div>
-    </SiteLayout>
-  );
+}=useCart();
+
+
+
+
+
+const itemCount =
+items.reduce(
+(sum,item)=>
+sum + item.quantity,
+0
+);
+
+  const total = items.reduce(
+
+(sum,item)=>
+
+sum +
+(
+Number(item.dish.price ?? 0)
+*
+item.quantity
+),
+
+0
+
+);
+
+return (
+
+<SiteLayout>
+
+
+<main className="
+mx-auto
+max-w-5xl
+px-4
+py-10
+md:px-6
+">
+
+
+<div className="
+flex
+items-center
+gap-3
+">
+
+
+<Link
+
+to="/menu"
+
+className="
+inline-flex
+size-10
+items-center
+justify-center
+rounded-full
+border
+"
+
+>
+
+
+<ArrowLeft
+className="size-4"
+/>
+
+
+</Link>
+
+
+
+<div>
+
+
+<p className="
+text-xs
+font-semibold
+uppercase
+tracking-[0.3em]
+text-primary
+">
+
+Ember & Oak
+
+</p>
+
+
+<h1 className="
+mt-1
+font-display
+text-4xl
+">
+
+Your Order
+
+</h1>
+
+
+</div>
+
+
+</div>
+
+
+{
+items.length === 0 ?
+          <div
+            className="
+mt-12
+rounded-2xl
+border
+border-dashed
+p-12
+text-center
+">
+
+
+<ShoppingBag
+
+className="
+mx-auto
+size-10
+text-muted-foreground
+"
+
+/>
+
+
+
+<h2 className="
+mt-4
+text-lg
+font-semibold
+">
+
+Your order is empty
+
+</h2>
+
+
+
+<p className="
+mt-2
+text-sm
+text-muted-foreground
+">
+
+Add something delicious from the menu.
+
+</p>
+
+
+
+<Link
+
+to="/menu"
+
+className="
+mt-6
+inline-flex
+rounded-full
+bg-primary
+px-5
+py-3
+font-semibold
+text-primary-foreground
+"
+
+>
+
+Browse Menu
+
+</Link>
+
+
+
+</div>
+
+
+
+:
+
+
+
+
+
+<div className="
+mt-8
+grid
+gap-6
+lg:grid-cols-[1fr_320px]
+">
+
+
+
+
+
+<section className="
+space-y-4
+">
+
+
+
+{
+items.map((item)=>(
+
+
+
+<div
+
+key={item.dish.id}
+
+className="
+flex
+gap-4
+rounded-2xl
+border
+bg-card
+p-4
+"
+
+>
+
+
+
+
+
+<div className="
+flex
+size-20
+shrink-0
+items-center
+justify-center
+rounded-xl
+bg-muted
+overflow-hidden
+">
+
+
+{
+item.dish.image ?
+
+
+
+<img
+
+src={item.dish.image}
+
+alt={item.dish.name}
+
+className="
+h-full
+w-full
+object-cover
+"
+
+/>
+
+
+
+:
+
+
+
+<span className="text-3xl">
+
+🍽️
+
+</span>
+
+
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between text-muted-foreground">
-      <dt>{label}</dt>
-      <dd className="text-foreground">{value}</dd>
-    </div>
-  );
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div className="
+flex-1
+">
+
+
+<div className="
+flex
+justify-between
+gap-3
+">
+
+
+<div>
+
+
+<h3 className="
+font-semibold
+">
+
+{item.dish.name}
+
+</h3>
+
+
+
+<p className="
+mt-1
+text-xs
+text-muted-foreground
+">
+
+{item.dish.description}
+
+</p>
+
+
+
+<p className="
+mt-2
+font-semibold
+text-primary
+">
+
+$
+
+{
+Number(item.dish.price ?? 0)
+.toFixed(2)
 }
 
-function ModeCard({ active, onClick, icon, title, desc }: { active: boolean; onClick: () => void; icon: React.ReactNode; title: string; desc: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${active ? "border-primary bg-primary/5 shadow-ember" : "border-border hover:border-primary/50"}`}
-    >
-      <span className="mt-0.5">{icon}</span>
-      <span>
-        <span className="block font-semibold leading-tight">{title}</span>
-        <span className="mt-0.5 block text-xs text-muted-foreground">{desc}</span>
-      </span>
-    </button>
-  );
+</p>
+
+
+
+</div>
+
+
+
+
+
+<button
+
+type="button"
+
+onClick={()=>removeItem(item.dish.id)}
+
+className="
+text-muted-foreground
+hover:text-destructive
+"
+
+>
+
+
+<Trash2 size={18}/>
+
+
+</button>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div className="
+mt-4
+flex
+items-center
+justify-between
+">
+
+
+
+<div className="
+flex
+items-center
+rounded-full
+border
+">
+
+
+<button
+
+type="button"
+
+onClick={()=>decrease(item.dish.id)}
+
+className="
+size-9
+flex
+items-center
+justify-center
+hover:bg-muted
+"
+
+>
+
+<Minus size={16}/>
+
+</button>
+
+
+
+
+
+<span className="
+w-10
+text-center
+font-semibold
+">
+
+{item.quantity}
+
+</span>
+
+
+
+
+
+<button
+
+type="button"
+
+onClick={()=>increase(item.dish.id)}
+
+className="
+size-9
+flex
+items-center
+justify-center
+hover:bg-muted
+"
+
+>
+
+<Plus size={16}/>
+
+</button>
+
+
+
+
+</div>
+
+
+
+
+<div className="font-semibold">
+
+
+$
+
+{
+(
+Number(item.dish.price ?? 0)
+*
+item.quantity
+)
+.toFixed(2)
+}
+
+
+</div>
+
+
+
+</div>
+
+
+
+
+</div>
+
+
+
+</div>
+
+
+
+))
+
+}
+
+
+
+
+
+
+<button
+
+type="button"
+
+onClick={clearCart}
+
+className="
+text-sm
+font-medium
+text-destructive
+hover:underline
+"
+
+>
+
+Clear order
+
+</button>
+
+
+
+
+</section>
+
+
+
+
+
+
+
+
+
+<aside className="
+h-fit
+rounded-2xl
+border
+bg-card
+p-5
+">
+
+
+<h2 className="
+text-lg
+font-semibold
+">
+
+Order Summary
+
+</h2>
+
+
+
+
+
+<div className="
+mt-5
+space-y-3
+text-sm
+">
+
+
+<div className="
+flex
+justify-between
+">
+
+<span className="text-muted-foreground">
+
+Items
+
+</span>
+
+
+<span>
+
+{itemCount}
+
+</span>
+
+
+</div>
+<div className="
+flex
+justify-between
+border-t
+pt-3
+">
+<span>
+Total
+</span>
+<span className="
+font-bold
+text-primary
+">
+${total.toFixed(2)}
+</span>
+</div>
+</div>
+<Link
+
+to="/checkout"
+
+className="
+mt-6
+block
+w-full
+rounded-full
+bg-primary
+px-4
+py-3
+text-center
+font-semibold
+text-primary-foreground
+"
+>
+Checkout
+</Link>
+</aside>
+</div>
+
+
+
+}
+
+
+
+</main>
+
+
+</SiteLayout>
+
+
+);
+
+
 }
