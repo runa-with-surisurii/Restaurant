@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import pandas as pd
 from pymongo import MongoClient
 
@@ -9,12 +10,13 @@ client = MongoClient(MONGO_URL)
 
 db = client["restaurant_db"]
 
-DATASET_FOLDER = r"D:\Restaurant\dataset"
+
+DATASET_FOLDER = Path(__file__).resolve().parent.parent / "dataset"
 
 
 def import_csv(filename):
 
-    file_path = os.path.join(DATASET_FOLDER, filename)
+    file_path = DATASET_FOLDER / filename
 
     collection_name = os.path.splitext(filename)[0]
 
@@ -22,6 +24,14 @@ def import_csv(filename):
     print("Importing:", filename)
 
     df = pd.read_csv(file_path)
+
+    if collection_name == "menu_items":
+        if "cost_price" not in df.columns:
+            df["cost_price"] = 0
+        if "available_status" not in df.columns:
+            df["available_status"] = "Available"
+        if "image" not in df.columns:
+            df["image"] = df["menu_id"].map(lambda menu_id: f"/menu/{menu_id}.jpg")
 
     df = df.where(pd.notnull(df), None)
 

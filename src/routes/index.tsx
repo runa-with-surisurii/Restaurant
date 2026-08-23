@@ -5,7 +5,6 @@ import { ArrowRight, Flame, MapPin, Clock, Sparkles } from "lucide-react";
 import { SiteLayout } from "@/components/site-layout";
 import { DishCard } from "@/components/dish-card";
 import { categories, dishes, promotions } from "@/lib/data";
-import heroImg from "@/assets/hero-food.jpg";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -19,7 +18,7 @@ function Index() {
     <SiteLayout>
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -z-10">
-          <img src={heroImg} alt="" className="h-full w-full object-cover" width={1600} height={1000} />
+          <div className="h-full w-full bg-gradient-to-br from-charcoal via-charcoal/90 to-primary/70" />
           <div className="absolute inset-0 bg-gradient-to-r from-charcoal/95 via-charcoal/70 to-charcoal/30" />
         </div>
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-24 text-primary-foreground md:grid-cols-2 md:py-36 md:px-6">

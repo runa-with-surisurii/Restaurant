@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/menu")({
   head: () => ({
-    meta: [{ title: "Menu Editor — Admin" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Menu Management — Admin" }, { name: "robots", content: "noindex" }],
   }),
   component: MenuAdmin,
 });
@@ -37,6 +37,8 @@ const empty = (): Dish => ({
   name: "",
   description: "",
   price: 0,
+  costPrice: 0,
+  availableStatus: "Available",
   image: "",
   categoryId: categories[0]?.id ?? "",
   rating: 4.5,
@@ -47,7 +49,7 @@ const empty = (): Dish => ({
 });
 
 function MenuAdmin() {
-  const { adminUser, dishesState, addDish, updateDish, deleteDish } = useStore();
+  const { adminUser, dishesState, addDish, updateDish } = useStore();
   const navigate = useNavigate();
   useEffect(() => {
     if (adminUser && adminUser.role !== "main_admin") navigate({ to: "/admin" });
@@ -55,12 +57,50 @@ function MenuAdmin() {
 
   const [editing, setEditing] = useState<Dish | null>(null);
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [catalog, setCatalog] = useState<Dish[]>(dishesState);
+  const categoryOptions = useMemo(
+    () => Array.from(new Set(catalog.map((dish) => dish.categoryId))).filter(Boolean),
+    [catalog],
+  );
+
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/api/menu")
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Unable to load menu")))
+      .then((items: Array<Record<string, unknown>>) => {
+        setCatalog(items.map((item, index) => ({
+          id: String(item.id ?? item.menu_id ?? index),
+          name: String(item.name ?? item.menu_name ?? "Unnamed menu item"),
+          description: String(item.description ?? ""),
+          price: Number(item.price ?? 0),
+          costPrice: Number(item.costPrice ?? item.cost_price ?? 0),
+          availableStatus: item.availableStatus === "Unavailable" || item.available_status === "Unavailable" ? "Unavailable" : "Available",
+          image: String(item.image ?? ""),
+          categoryId: String(item.category ?? "other").toLowerCase(),
+          rating: 4.5,
+          reviewCount: 0,
+          tags: [],
+          prepTime: 15,
+          calories: 0,
+        })));
+      })
+      .catch(() => setCatalog(dishesState));
+  }, [dishesState]);
+
+  const filteredDishes = useMemo(() => catalog.filter((dish) => {
+    const matchesQuery = !query.trim() || `${dish.id} ${dish.name}`.toLowerCase().includes(query.toLowerCase());
+    const matchesCategory = category === "all" || dish.categoryId === category;
+    const matchesStatus = status === "all" || (dish.availableStatus ?? "Available") === status;
+    return matchesQuery && matchesCategory && matchesStatus;
+  }), [catalog, query, category, status]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl tracking-wide md:text-4xl">Menu Editor</h1>
+          <h1 className="font-display text-3xl tracking-wide md:text-4xl">Menu Management</h1>
           <p className="text-sm text-muted-foreground">Chain-wide dish catalog.</p>
         </div>
         <Dialog
@@ -78,13 +118,16 @@ function MenuAdmin() {
           </DialogTrigger>
           <DishDialog
             editing={editing}
+            categoryOptions={categoryOptions}
             onSubmit={(d) => {
               if (editing) {
                 updateDish(editing.id, d);
+                setCatalog((items) => items.map((item) => item.id === editing.id ? d : item));
                 toast.success("Dish updated");
               } else {
                 const id = d.id || d.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
                 addDish({ ...d, id });
+                setCatalog((items) => [...items, { ...d, id }]);
                 toast.success("Dish added");
               }
               setOpen(false);
@@ -95,12 +138,30 @@ function MenuAdmin() {
       </div>
 
       <Card>
+        <CardContent className="flex flex-wrap gap-3 pt-6">
+          <Input className="max-w-sm" placeholder="Search menu" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Category" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categoryOptions.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="Available">Available</SelectItem>
+              <SelectItem value="Unavailable">Unavailable</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
         <CardHeader>
           <CardTitle>All dishes</CardTitle>
-          <CardDescription>{dishesState.length} items</CardDescription>
+          <CardDescription>{filteredDishes.length} items</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {dishesState.map((d) => (
+          {filteredDishes.map((d) => (
             <div key={d.id} className="flex gap-3 rounded-lg border p-3">
               <img
                 src={d.image}
@@ -116,7 +177,7 @@ function MenuAdmin() {
                   <div className="text-sm font-medium">${d.price.toFixed(2)}</div>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {categories.find((c) => c.id === d.categoryId)?.name}
+                    {d.categoryId} · {d.availableStatus ?? "Available"}
                 </div>
                 <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{d.description}</p>
                 <div className="mt-2 flex gap-1">
@@ -135,8 +196,9 @@ function MenuAdmin() {
                     variant="ghost"
                     onClick={() => {
                       if (confirm(`Delete ${d.name}?`)) {
-                        deleteDish(d.id);
-                        toast("Dish deleted");
+                        updateDish(d.id, { availableStatus: "Unavailable" });
+                        setCatalog((items) => items.map((item) => item.id === d.id ? { ...item, availableStatus: "Unavailable" } : item));
+                        toast("Dish marked unavailable");
                       }
                     }}
                   >
@@ -152,11 +214,11 @@ function MenuAdmin() {
   );
 }
 
-function DishDialog({ editing, onSubmit }: { editing: Dish | null; onSubmit: (d: Dish) => void }) {
-  const [form, setForm] = useState<Dish>(editing ?? empty());
+function DishDialog({ editing, categoryOptions, onSubmit }: { editing: Dish | null; categoryOptions: string[]; onSubmit: (d: Dish) => void }) {
+    const [form, setForm] = useState<Dish>(editing ?? { ...empty(), categoryId: categoryOptions[0] ?? empty().categoryId });
   useEffect(() => {
-    setForm(editing ?? empty());
-  }, [editing]);
+      setForm(editing ?? { ...empty(), categoryId: categoryOptions[0] ?? empty().categoryId });
+    }, [editing, categoryOptions]);
   const set = <K extends keyof Dish>(k: K, v: Dish[K]) => setForm({ ...form, [k]: v });
 
   return (
@@ -183,6 +245,19 @@ function DishDialog({ editing, onSubmit }: { editing: Dish | null; onSubmit: (d:
               onChange={(e) => set("price", Number(e.target.value))}
             />
           </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label>Cost price ($)</Label>
+            <Input type="number" step="0.01" value={form.costPrice ?? 0} onChange={(e) => set("costPrice", Number(e.target.value))} />
+          </div>
+          <div className="space-y-1">
+            <Label>Status</Label>
+            <Select value={form.availableStatus ?? "Available"} onValueChange={(v) => set("availableStatus", v as Dish["availableStatus"])}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="Available">Available</SelectItem><SelectItem value="Unavailable">Unavailable</SelectItem></SelectContent>
+            </Select>
+          </div>
+        </div>
           <div className="space-y-1">
             <Label>Category</Label>
             <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>

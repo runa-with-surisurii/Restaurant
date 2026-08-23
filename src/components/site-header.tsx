@@ -45,12 +45,6 @@ const staffNav = [
     roles:["main_admin"]
   },
 
-  {
-    to:"/branch-manager",
-    label:"Branch Manager",
-    roles:["main_admin","branch_manager"]
-  }
-
 ] as const;
 
 

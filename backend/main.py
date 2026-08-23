@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from collections import defaultdict
+from datetime import datetime, timedelta
+import math
 from orders import router as order_router
 from branch_dashboard import router as branch_dashboard_router
 from branch_inventory import router as branch_inventory_router
@@ -24,8 +26,12 @@ app.add_middleware(
 
         "http://localhost:8080",
         "http://localhost:8081",
+        "http://localhost:8082",
+        "http://localhost:5173",
         "http://127.0.0.1:8080",
         "http://127.0.0.1:8081",
+        "http://127.0.0.1:8082",
+        "http://127.0.0.1:5173",
 
     ],
 
@@ -136,19 +142,9 @@ def get_menu():
     result = []
 
     for item in items:
-        name = str(
-            item.get(
-                "MenuItemName",
-                ""
-            )
-        ).strip()
+        name = str(item.get("menu_name") or item.get("MenuItemName") or "").strip()
 
-        description = str(
-            item.get(
-                "MenuItemDescription",
-                ""
-            )
-        ).strip()
+        description = str(item.get("description") or item.get("MenuItemDescription") or "").strip()
 
         text = (
             f"{name} {description}"
@@ -158,10 +154,10 @@ def get_menu():
         # IMPROVED CATEGORY
         # ====================================================
 
-        category = "Other"
+        category = str(item.get("category") or "Other").strip()
 
         # Sandwiches
-        if any(
+        if not item.get("category") and any(
             word in text
             for word in [
 
@@ -190,7 +186,7 @@ def get_menu():
 
         # Burgers
 
-        elif any(
+        elif not item.get("category") and any(
             word in text
             for word in [
                 "burger",
@@ -203,7 +199,7 @@ def get_menu():
 
         # Pizza
 
-        elif any(
+        elif not item.get("category") and any(
             word in text
             for word in [
                 "pizza",
@@ -214,7 +210,7 @@ def get_menu():
 
         # Salads
 
-        elif any(
+        elif not item.get("category") and any(
             word in text
             for word in [
                 "salad",
@@ -224,7 +220,7 @@ def get_menu():
             category = "Salads"
 
         # Desserts
-        elif any(
+        elif not item.get("category") and any(
             word in text
             for word in [
 
@@ -242,13 +238,8 @@ def get_menu():
         # PRICE
         # ====================================================
 
-        plu = item.get(
-            "PLU"
-        )
-        price = price_map.get(
-            plu,
-            0
-        )
+        plu = item.get("PLU")
+        price = item.get("price", price_map.get(plu, 0))
         try:
             price = float(price)
         except:
@@ -260,9 +251,7 @@ def get_menu():
 
         result.append({
 
-            "id": item.get(
-                "MenuItemId"
-            ),
+            "id": item.get("menu_id") or item.get("MenuItemId"),
             "name": name,
             "description": description,
             "plu": plu,
@@ -271,7 +260,9 @@ def get_menu():
             ),
             "category": category,
             "price": price,
-            "image": ""
+            "costPrice": float(item.get("cost_price") or 0),
+            "availableStatus": item.get("available_status") or "Available",
+            "image": item.get("image") or f"/menu/{item.get('menu_id') or item.get('MenuItemId')}.jpg"
         })
     return result
 
@@ -281,50 +272,10 @@ def get_menu():
 
 @app.get("/api/menu/categories")
 def get_menu_categories():
-
-    return [
-
-        {
-            "id":"all",
-            "name":"All",
-            "emoji":"🍽️"
-        },
-
-        {
-            "id":"sandwiches",
-            "name":"Sandwiches",
-            "emoji":"🥪"
-        },
-
-        {
-            "id":"burgers",
-            "name":"Burgers",
-            "emoji":"🍔"
-        },
-
-        {
-            "id":"pizza",
-            "name":"Pizza",
-            "emoji":"🍕"
-        },
-
-        {
-            "id":"salads",
-            "name":"Salads",
-            "emoji":"🥗"
-        },
-
-        {
-            "id":"desserts",
-            "name":"Desserts",
-            "emoji":"🍰"
-        },
-
-        {
-            "id":"other",
-            "name":"Other",
-            "emoji":"🍴"
-        }
+    values = db["menu_items"].distinct("category")
+    return [{"id": "all", "name": "All", "emoji": "🍽️"}] + [
+        {"id": str(value).lower(), "name": str(value), "emoji": "🍴"}
+        for value in values if value
     ]
 
 # ============================================================
@@ -335,7 +286,7 @@ def get_menu_categories():
 def get_branches():
 
     branches = list(
-        db["store_restaurant"].find(
+        db["branches"].find(
             {},
             {"_id":0}
         )
@@ -346,34 +297,15 @@ def get_branches():
     for b in branches:
         result.append({
 
-            "storeNumber": b.get(
-                "STORE_NUMBER"
-            ),
+            "branchId": b.get("branch_id"),
+            "branchName": b.get("branch_name", "").strip(),
 
             "city": b.get(
-                "STORE_CITY",
+                "city",
                 ""
             ).strip(),
 
-            "state": b.get(
-                "STORE_STATE",
-                ""
-            ).strip(),
-
-            "region": b.get(
-                "DISTRIBUTION_REGION",
-                ""
-            ).strip(),
-
-            "type": b.get(
-                "STORE_TYPE",
-                ""
-            ).strip(),
-
-            "loyalty": b.get(
-                "STORE_LOYALTY_FLAG",
-                ""
-            )
+            "state": b.get("state", "").strip(),
 
         })
 
@@ -391,18 +323,16 @@ def get_ingredients():
     for item in ingredients:
         result.append({
 
-            "IngredientId": item.get(
-                "IngredientId"
-            ),
+            "IngredientId": item.get("ingredient_id") or item.get("IngredientId"),
 
             "IngredientName": item.get(
-                "IngredientName",
-                ""
+                "ingredient_name",
+                item.get("IngredientName", "")
             ).strip(),
 
             "Stock": item.get(
-                "Stock",
-                0
+                "unit_cost",
+                item.get("Stock", 0)
             ),
 
             "Unit": item.get(
@@ -458,6 +388,99 @@ def startup_event():
 # ============================================================
 # ANALYTICS - SALES OVERVIEW
 # ============================================================
+
+@app.get("/api/menu-insights")
+def menu_insights(branch_id: str = "all"):
+    menu_items = list(db["menu_items"].find({}, {"_id": 0}))
+    branches = list(db["branches"].find({}, {"_id": 0}))
+    orders = list(db["orders"].find({}, {"_id": 0}))
+    order_items = list(db["order_items"].find({}, {"_id": 0}))
+
+    valid_statuses = {"completed", "complete", "paid", "placed", "preparing", "ready"}
+    selected_orders = {
+        str(order.get("order_id")): order
+        for order in orders
+        if str(order.get("status", "completed")).strip().lower() not in {"cancelled", "canceled", "invalid"}
+        and (branch_id == "all" or str(order.get("branch_id")) == branch_id)
+    }
+    rows = {
+        str(item.get("menu_id")): {
+            "menuId": str(item.get("menu_id")),
+            "menu": item.get("menu_name", "Unknown menu"),
+            "category": item.get("category", "Unknown"),
+            "image": item.get("image", ""),
+            "sold": 0,
+            "revenue": 0.0,
+            "orders": 0,
+            "recent": 0,
+            "previous": 0,
+        }
+        for item in menu_items
+    }
+    dates = [
+        datetime.fromisoformat(str(order.get("order_date")))
+        for order in selected_orders.values()
+        if order.get("order_date")
+    ]
+    latest = max(dates) if dates else datetime.now()
+    split = latest - timedelta(days=30)
+    previous_split = latest - timedelta(days=60)
+    for item in order_items:
+        order = selected_orders.get(str(item.get("order_id")))
+        menu_id = str(item.get("menu_id"))
+        if not order or menu_id not in rows:
+            continue
+        quantity = float(item.get("quantity") or 0)
+        revenue = float(item.get("subtotal") or quantity * float(item.get("unit_price") or 0))
+        row = rows[menu_id]
+        row["sold"] += quantity
+        row["revenue"] += revenue
+        row["orders"] += 1
+        order_date = datetime.fromisoformat(str(order.get("order_date")))
+        if order_date >= split:
+            row["recent"] += quantity
+        elif order_date >= previous_split:
+            row["previous"] += quantity
+
+    active_rows = list(rows.values())
+    max_values = [max((row[key] for row in active_rows), default=1) or 1 for key in ("sold", "revenue", "orders")]
+    for row in active_rows:
+        row["growth"] = None if row["previous"] == 0 and row["recent"] == 0 else round(((row["recent"] - row["previous"]) / row["previous"] * 100), 1) if row["previous"] else None
+        row["score"] = round((row["sold"] / max_values[0] * 45) + (row["revenue"] / max_values[1] * 35) + (row["orders"] / max_values[2] * 20), 1)
+
+    # Small, deterministic K-Means over supported performance features.
+    features = [[row["sold"] / max_values[0], row["revenue"] / max_values[1], row["orders"] / max_values[2], (row["growth"] or 0) / 100] for row in active_rows]
+    k = min(4, len(features))
+    centroids = [features[index][:] for index in [0, len(features) // 3, (len(features) * 2) // 3, len(features) - 1][:k]] if features else []
+    for _ in range(12):
+        groups = [[] for _ in range(k)]
+        for feature in features:
+            index = min(range(k), key=lambda center: sum((feature[i] - centroids[center][i]) ** 2 for i in range(4)))
+            groups[index].append(feature)
+        for index, group in enumerate(groups):
+            if group:
+                centroids[index] = [sum(feature[i] for feature in group) / len(group) for i in range(4)]
+
+    ranked_centers = sorted(range(k), key=lambda index: sum(centroids[index][:3]), reverse=True)
+    label_by_cluster = {index: "Needs Attention" for index in range(k)}
+    if ranked_centers:
+        label_by_cluster[ranked_centers[0]] = "Best Sellers"
+    if len(ranked_centers) > 1:
+        label_by_cluster[max(ranked_centers[1:], key=lambda index: centroids[index][3])] = "Rising Stars"
+    for row, feature in zip(active_rows, features):
+        cluster = min(range(k), key=lambda center: sum((feature[i] - centroids[center][i]) ** 2 for i in range(4))) if k else 0
+        row["group"] = label_by_cluster.get(cluster, "Needs Attention")
+        row["profit"] = None
+        row["trend"] = "No trend data" if row["growth"] is None else f"{row['growth']:+.1f}%"
+        row["action"] = {"Best Sellers": "Keep & Promote", "Rising Stars": "Promote", "Needs Attention": "Review / Consider Dropping"}.get(row["group"], "Review")
+    active_rows.sort(key=lambda row: row["score"], reverse=True)
+    group_names = ["Best Sellers", "Rising Stars", "Popular but Low Margin", "Needs Attention"]
+    groups_response = []
+    for name in group_names:
+        members = [row for row in active_rows if row.get("group") == name]
+        groups_response.append({"name": name, "count": len(members), "example": members[0]["menu"] if members else None})
+    trending = sorted([row for row in active_rows if row["growth"] is not None], key=lambda row: row["growth"], reverse=True)[:6]
+    return {"branches": [{"id": b.get("branch_id"), "name": b.get("branch_name"), "city": b.get("city", "")} for b in branches], "hasProfit": False, "groups": groups_response, "rows": active_rows, "trending": trending}
 # ============================================================
 # ANALYTICS DASHBOARD
 # ============================================================
@@ -754,6 +777,18 @@ class LoginRequest(BaseModel):
 
 @app.post("/api/login")
 def login(data:LoginRequest):
+
+    if data.username.strip().lower() == "customer" and data.password == "c1":
+        return {
+            "success": True,
+            "user": {
+                "_id": "customer",
+                "username": "customer",
+                "name": "Customer",
+                "phone": "",
+                "role": "customer",
+            },
+        }
 
     user = db["users"].find_one(
         {

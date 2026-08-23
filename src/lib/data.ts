@@ -1,10 +1,10 @@
-import burger from "@/assets/dish-burger.jpg";
-import pizza from "@/assets/dish-pizza.jpg";
-import steak from "@/assets/dish-steak.jpg";
-import salad from "@/assets/dish-salad.jpg";
-import pasta from "@/assets/dish-pasta.jpg";
-import dessert from "@/assets/dish-dessert.jpg";
-import wings from "@/assets/dish-wings.jpg";
+const burger = "";
+const pizza = "";
+const steak = "";
+const salad = "";
+const pasta = "";
+const dessert = "";
+const wings = "";
 
 export type Category = { id: string; name: string; emoji: string };
 
@@ -13,6 +13,8 @@ export type Dish = {
   name: string;
   description: string;
   price: number;
+  costPrice?: number;
+  availableStatus?: "Available" | "Unavailable";
   image: string;
   categoryId: string;
   rating: number;

@@ -9,6 +9,7 @@ import {
   BookOpen,
   Flame,
   ArrowLeft,
+  BarChart3,
   Bell,
   ChevronDown,
   ChevronRight,
@@ -83,7 +84,8 @@ export type BranchManagerNavId =
   | "settings"
   | "overview"
   | "branches"
-  | "menu-editor";
+  | "menu-editor"
+  | "menu-insights";
 
 export type BranchManagerNavItem = {
   id: BranchManagerNavId;
@@ -170,10 +172,19 @@ export const branchManagerNav: BranchManagerNavItem[] = [
   {
     id:"menu-editor",
     to:"/admin/menu",
-    label:"Menu Editor",
+    label:"Menu Management",
     icon:BookOpen,
     section:"chain",
     description:"Chain-wide menu",
+  },
+
+  {
+    id:"menu-insights",
+    to:"/admin/menu-insights",
+    label:"Menu Insights",
+    icon:BarChart3,
+    section:"chain",
+    description:"Menu performance analysis",
   },
 
 ];
@@ -386,7 +397,7 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
             ) : null}
           </div>
 
-          <div className={cn("mt-4 flex w-full", collapsed && "justify-center")}>
+          <div className="hidden">
             {!forcedBranch && branches.length > 0 ? (
               <div className={cn("w-full px-3", collapsed && "px-2")}>
                 <Select
@@ -829,7 +840,8 @@ function buildBreadcrumbs(
     },
     { test: new RegExp(`^${P}\\/overview$`), label: "Chain Overview" },
     { test: new RegExp(`^${P}\\/branches$`), label: "Branches", to: `${prefix}/branches` },
-    { test: new RegExp(`^${P}\\/menu$`), label: "Menu Editor" },
+    { test: new RegExp(`^${P}\\/menu$`), label: "Menu Management" },
+    { test: new RegExp(`^${P}\\/menu-insights$`), label: "Menu Insights" },
     { test: new RegExp(`^${P}\\/orders$`), label: "Orders", to: `${prefix}/orders` },
     { test: new RegExp(`^${P}\\/menu-availability$`), label: "Menu Availability" },
     { test: new RegExp(`^${P}\\/bookings$`), label: "Reservations" },

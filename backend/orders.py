@@ -96,9 +96,10 @@ def create_order(order:dict):
             try:
 
                 menu=db["menu_items"].find_one({
-
-                    "MenuItemId":int(dish_id)
-
+                    "$or": [
+                        {"menu_id": dish_id},
+                        {"MenuItemId": int(dish_id) if str(dish_id).isdigit() else -1},
+                    ]
                 })
 
             except:
@@ -150,8 +151,7 @@ def create_order(order:dict):
     order_data={
 
 
-        "branchId":
-        int(order.get("branchId")),
+        "branchId": order.get("branchId"),
 
 
         "createdBy":

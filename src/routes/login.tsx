@@ -561,24 +561,7 @@ text-sm
 ">
 
 
-Customer?
-
-
-<Link
-
-to="/register"
-
-className="
-ml-1
-font-semibold
-text-primary
-"
-
->
-
-Create Account
-
-</Link>
+Customer: customer / c1
 
 
 

@@ -25,6 +25,7 @@ import {
 import {
   useStore,
 } from "@/lib/store";
+import { branches } from "@/lib/data";
 
 
 
@@ -59,8 +60,11 @@ const {
 
 
 const {
-  adminUser
+  selectedBranchId,
+  user,
 }=useStore();
+
+const selectedBranch = branches.find((branch) => branch.id === selectedBranchId);
 
 
 
@@ -100,17 +104,17 @@ const submitOrder = async()=>{
 
 
 
-if(!adminUser){
+if(!selectedBranchId){
 
 
 toast.error(
-"Please login as branch manager"
+"Please choose a branch first"
 );
 
 
 navigate({
 
-to:"/login",
+  to:"/menu",
 
 replace:true
 
@@ -162,11 +166,11 @@ body:JSON.stringify({
 
 
 branchId:
-adminUser.branchId,
+  selectedBranchId,
 
 
 createdBy:
-adminUser.username || adminUser.name,
+  user?.name || "customer",
 
 
 
@@ -400,7 +404,7 @@ Branch:
 
 <b>
 {" "}
-{adminUser?.branchId || "-"}
+ {selectedBranch?.name || selectedBranchId || "-"}
 </b>
 
 </p>
@@ -413,7 +417,7 @@ Cashier:
 
 <b>
 {" "}
-{adminUser?.name || "-"}
+ {user?.name || "Guest"}
 </b>
 
 </p>

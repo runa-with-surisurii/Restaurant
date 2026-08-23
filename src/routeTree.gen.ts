@@ -35,6 +35,7 @@ import { Route as AdminInventoryRouteImport } from './routes/admin.inventory'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminMenuRouteImport } from './routes/admin.menu'
 import { Route as AdminMenuAvailabilityRouteImport } from './routes/admin.menu-availability'
+import { Route as AdminMenuInsightsRouteImport } from './routes/admin.menu-insights'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminOverviewRouteImport } from './routes/admin.overview'
 import { Route as AdminSalesReportsRouteImport } from './routes/admin.sales-reports'
@@ -182,6 +183,11 @@ const AdminMenuAvailabilityRoute = AdminMenuAvailabilityRouteImport.update({
   path: '/menu-availability',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminMenuInsightsRoute = AdminMenuInsightsRouteImport.update({
+  id: '/menu-insights',
+  path: '/menu-insights',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminOrdersRoute = AdminOrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
@@ -292,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/admin/login': typeof AdminLoginRoute
   '/admin/menu': typeof AdminMenuRoute
   '/admin/menu-availability': typeof AdminMenuAvailabilityRoute
+  '/admin/menu-insights': typeof AdminMenuInsightsRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/sales-reports': typeof AdminSalesReportsRoute
@@ -334,6 +341,7 @@ export interface FileRoutesByTo {
   '/admin/login': typeof AdminLoginRoute
   '/admin/menu': typeof AdminMenuRoute
   '/admin/menu-availability': typeof AdminMenuAvailabilityRoute
+  '/admin/menu-insights': typeof AdminMenuInsightsRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/sales-reports': typeof AdminSalesReportsRoute
@@ -379,6 +387,7 @@ export interface FileRoutesById {
   '/admin/login': typeof AdminLoginRoute
   '/admin/menu': typeof AdminMenuRoute
   '/admin/menu-availability': typeof AdminMenuAvailabilityRoute
+  '/admin/menu-insights': typeof AdminMenuInsightsRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/sales-reports': typeof AdminSalesReportsRoute
@@ -425,6 +434,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/menu'
     | '/admin/menu-availability'
+    | '/admin/menu-insights'
     | '/admin/orders'
     | '/admin/overview'
     | '/admin/sales-reports'
@@ -467,6 +477,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/menu'
     | '/admin/menu-availability'
+    | '/admin/menu-insights'
     | '/admin/orders'
     | '/admin/overview'
     | '/admin/sales-reports'
@@ -511,6 +522,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/menu'
     | '/admin/menu-availability'
+    | '/admin/menu-insights'
     | '/admin/orders'
     | '/admin/overview'
     | '/admin/sales-reports'
@@ -737,6 +749,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMenuAvailabilityRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/menu-insights': {
+      id: '/admin/menu-insights'
+      path: '/menu-insights'
+      fullPath: '/admin/menu-insights'
+      preLoaderRoute: typeof AdminMenuInsightsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/orders': {
       id: '/admin/orders'
       path: '/orders'
@@ -860,6 +879,7 @@ interface AdminRouteChildren {
   AdminLoginRoute: typeof AdminLoginRoute
   AdminMenuRoute: typeof AdminMenuRoute
   AdminMenuAvailabilityRoute: typeof AdminMenuAvailabilityRoute
+  AdminMenuInsightsRoute: typeof AdminMenuInsightsRoute
   AdminOrdersRoute: typeof AdminOrdersRoute
   AdminOverviewRoute: typeof AdminOverviewRoute
   AdminSalesReportsRoute: typeof AdminSalesReportsRoute
@@ -875,6 +895,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminLoginRoute: AdminLoginRoute,
   AdminMenuRoute: AdminMenuRoute,
   AdminMenuAvailabilityRoute: AdminMenuAvailabilityRoute,
+  AdminMenuInsightsRoute: AdminMenuInsightsRoute,
   AdminOrdersRoute: AdminOrdersRoute,
   AdminOverviewRoute: AdminOverviewRoute,
   AdminSalesReportsRoute: AdminSalesReportsRoute,

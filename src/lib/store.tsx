@@ -67,6 +67,9 @@ export type Booking = {
 };
 
 type Store = {
+  selectedBranchId: string | null;
+  selectBranch: (branchId: string) => void;
+  clearSelectedBranch: () => void;
   // cart
   cart: CartItem[];
   addToCart: (dishId: string, qty?: number) => void;
@@ -165,6 +168,7 @@ const StoreContext = createContext<Store | null>(null);
 const KEY = "ember-oak-store-v3";
 
 type Persisted = {
+  selectedBranchId: string | null;
   cart: CartItem[];
   favorites: string[];
   orders: Order[];
@@ -219,6 +223,7 @@ const STAFF_CREDENTIALS = [
     name: "Elmhurst Branch Manager",
   },
 ];
+const CUSTOMER_CREDENTIALS = { username: "customer", password: "c1" };
 const seededReviews: Review[] = [
   {
     id: "r1",
@@ -314,6 +319,7 @@ const seededReviews: Review[] = [
 ];
 
 const initial = (): Persisted => ({
+  selectedBranchId: null,
   cart: [],
   favorites: [],
   orders: [],
@@ -339,6 +345,7 @@ const load = (): Persisted => {
     if (!raw) return base;
     const parsed = JSON.parse(raw) as Partial<Persisted>;
     return {
+      selectedBranchId: parsed.selectedBranchId ?? base.selectedBranchId,
       cart: parsed.cart ?? base.cart,
       favorites: parsed.favorites ?? base.favorites,
       orders: parsed.orders ?? base.orders,
@@ -385,6 +392,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     );
     const currentRole: AuthRole | null = state.adminUser?.role ?? (state.user ? "customer" : null);
     return {
+      selectedBranchId: state.selectedBranchId,
+      selectBranch: (branchId) => setState((prev) => ({ ...prev, selectedBranchId: branchId })),
+      clearSelectedBranch: () => patch({ selectedBranchId: null }),
       cart: state.cart,
       addToCart: (dishId, qty = 1) =>
         setState((prev) => {
@@ -485,6 +495,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       currentRole,
       isAuthenticated: Boolean(state.user || state.adminUser),
       authenticate: async (identifier, password) => {
+        if (identifier.trim().toLowerCase() === CUSTOMER_CREDENTIALS.username && password === CUSTOMER_CREDENTIALS.password) {
+          const user = { id: "customer", name: "Customer", email: "customer", phone: "" };
+          patch({ adminUser: null, user });
+          return "customer";
+        }
+
+        const staffAccount = STAFF_CREDENTIALS.find(
+          (account) =>
+            account.username === identifier.trim() &&
+            account.password === password,
+        );
+
+        if (staffAccount) {
+          patch({
+            user: null,
+            adminUser: {
+              name: staffAccount.name,
+              role: staffAccount.role,
+              branchId: staffAccount.branchId,
+            },
+          });
+
+          return staffAccount.role;
+        }
+
         const response = await fetch("http://127.0.0.1:8000/api/login", {
           method: "POST",
 
