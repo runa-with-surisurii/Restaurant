@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { User, Store, Bell, Clock, Receipt, KeyRound, Mail, Smartphone, Save, RefreshCw } from "lucide-react";
+import { User, Store, Clock, Receipt, KeyRound, Mail, Smartphone, Save, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,6 @@ export function SettingsPage() {
         <TabsList className="grid w-full grid-cols-3 max-w-xl">
           <TabsTrigger value="profile" className="gap-2"><User className="size-4" /> Profile</TabsTrigger>
           <TabsTrigger value="branch" className="gap-2"><Store className="size-4" /> Branch</TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2"><Bell className="size-4" /> Notifications</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-6 space-y-6">

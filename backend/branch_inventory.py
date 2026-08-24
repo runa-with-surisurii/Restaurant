@@ -175,102 +175,47 @@ def initialize_branch_inventory():
 
 
 @router.get("/api/branch-inventory/{branch_id}")
-def get_branch_inventory(branch_id:int):
+def get_branch_inventory(branch_id: str):
+    legacy_id = int(branch_id) if branch_id.isdigit() else -1
+    ingredient_names = {
+        item.get("ingredient_id"): item.get("ingredient_name", "Unknown")
+        for item in db["ingredients"].find({}, {"_id": 0, "ingredient_id": 1, "ingredient_name": 1})
+    }
+    inventory = list(db["branch_inventory"].find(
+        {"$or": [
+            {"branch_id": branch_id},
+            {"branchId": branch_id},
+            {"branchId": legacy_id},
+        ]},
+        {"_id": 0},
+    ))
 
-
-
-    inventory = list(
-
-        db["branch_inventory"].find(
-
+    if not inventory:
+        inventory = [
             {
-
-                "branchId":branch_id
-
-            },
-
-
-            {
-
-                "_id":0
-
+                "branch_id": branch_id,
+                "ingredient_id": ingredient_id,
+                "ingredient_name": name,
+                "stock_quantity": 0,
+                "unit": unit,
             }
+            for ingredient_id, name, unit in db["ingredients"].find(
+                {}, {"_id": 0, "ingredient_id": 1, "ingredient_name": 1, "unit": 1}
+            ).sort("ingredient_id", 1)
+        ]
 
-        )
-
-    )
-
-
-
-
-    result=[]
-
-
-
+    result = []
     for item in inventory:
-
-
-
-        stock,unit = convert_unit(
-
-            item.get(
-                "Stock",
-                0
-            ),
-
-            item.get(
-                "Unit",
-                ""
-            )
-
+        stock, unit = convert_unit(
+            item.get("Stock", item.get("stock_quantity", 0)),
+            item.get("Unit", item.get("unit", "")),
         )
-
-
-
         result.append({
-
-
-
-            "IngredientId":
-
-                item.get(
-                    "IngredientId"
-                ),
-
-
-
-            "IngredientName":
-
-                item.get(
-                    "IngredientName"
-                ),
-
-
-
-            "Stock":
-
-                stock,
-
-
-
-            "Unit":
-
-                unit,
-
-
-
-            "branchId":
-
-                item.get(
-                    "branchId"
-                )
-
-
-
+            "IngredientId": item.get("IngredientId", item.get("ingredient_id")),
+            "IngredientName": item.get("IngredientName", item.get("ingredient_name", ingredient_names.get(item.get("ingredient_id"), "Unknown"))),
+            "Stock": stock,
+            "Unit": unit,
+            "branchId": item.get("branchId", item.get("branch_id", branch_id)),
         })
-
-
-
-
 
     return result

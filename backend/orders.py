@@ -208,11 +208,24 @@ def create_order(order:dict):
 
 
 # =====================================================
+# GET ALL ORDERS
+# =====================================================
+
+@router.get("/api/orders/all")
+def get_all_orders():
+    orders = list(db["orders"].find({}).sort("createdAt", -1))
+
+    for order in orders:
+        order["_id"] = str(order["_id"])
+
+    return orders
+
+# =====================================================
 # GET ORDERS
 # =====================================================
 
 @router.get("/api/orders/{branch_id}")
-def get_orders(branch_id:int):
+def get_orders(branch_id:str):
 
 
     orders=list(
@@ -221,17 +234,12 @@ def get_orders(branch_id:int):
 
             "$or":[
 
-                {
-                    "branchId":branch_id
-                },
-
-                {
-                    "branchId":str(branch_id)
-                }
+                {"branchId": branch_id},
+                {"branch_id": branch_id},
 
             ]
 
-        })
+        }).sort("createdAt", -1)
 
     )
 

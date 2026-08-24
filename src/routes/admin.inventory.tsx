@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { useBranchShell } from "@/components/branch-admin/BranchShell";
 
 export const Route = createFileRoute("/admin/inventory")({
   head: () => ({
@@ -49,13 +50,14 @@ const INV_DATA: InvItem[] = [
 
 export function InventoryPage() {
   const { adminUser } = useStore();
-  const branchId = adminUser?.branchId ?? "br-downtown";
+  const { activeBranchId } = useBranchShell();
+  const branchId = adminUser?.branchId ?? activeBranchId;
   const [tab, setTab] = useState<"all" | "low" | "out">("all");
   const [q, setQ] = useState("");
 
   const { filtered, kpis } = useMemo(() => {
     let items = INV_DATA.map((i) => ({ ...i }));
-    if (branchId === "br-westside") {
+    if (branchId === "BR003") {
       items = items.map((i) => ({ ...i, inStock: Math.max(0, Math.round(i.inStock * 0.55 * 10) / 10) }));
     }
     if (tab === "low") items = items.filter((i) => i.inStock > 0 && i.inStock <= i.reorderLevel);

@@ -10,7 +10,6 @@ import {
   Flame,
   ArrowLeft,
   BarChart3,
-  Bell,
   ChevronDown,
   ChevronRight,
   Home,
@@ -18,13 +17,10 @@ import {
   Package,
   PanelLeftClose,
   Search as SearchIcon,
-  Settings as SettingsIcon,
-  Sparkles,
   Star,
   Store,
   TrendingUp,
   X,
-  User as UserIcon,
   LogOut,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -58,7 +54,6 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -75,6 +70,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import type { Branch } from "@/lib/data";
+import { branches as canonicalBranches } from "@/lib/data";
 
 export type BranchManagerNavId =
   | "dashboard"
@@ -98,6 +94,15 @@ export type BranchManagerNavItem = {
 };
 
 export const branchManagerNav: BranchManagerNavItem[] = [
+
+  {
+    id: "overview",
+    to: "/admin/overview",
+    label: "Branch Performance",
+    icon: TrendingUp,
+    section: "chain",
+    description: "Compare overall branch performance",
+  },
 
   {
     id:"dashboard",
@@ -136,26 +141,6 @@ export const branchManagerNav: BranchManagerNavItem[] = [
     icon:TrendingUp,
     section:"branch",
     description:"Revenue and sales analysis",
-  },
-
-
-  {
-    id:"settings",
-    to:"/branch-manager/settings",
-    label:"Settings",
-    icon:SettingsIcon,
-    section:"branch",
-    description:"Branch preferences",
-  },
-
-
-  {
-    id:"overview",
-    to:"/admin/overview",
-    label:"Chain Overview",
-    icon:Sparkles,
-    section:"chain",
-    description:"Roll-up across locations",
   },
 
 
@@ -226,12 +211,20 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
 
   const isMainAdmin = adminUser?.role === "main_admin";
   const forcedBranch = adminUser?.branchId;
-  const branches = branchesState;
+  const branches = canonicalBranches;
 
   const [activeBranchId, setActiveBranchId] = useState<string>(() => {
     if (forcedBranch) return forcedBranch;
-    return branches[0]?.id ?? "all";
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem("ember-oak-admin-branch");
+      return saved === "all" || branches.some((branch) => branch.id === saved) ? saved ?? "all" : "all";
+    }
+    return "all";
   });
+
+  useEffect(() => {
+    if (!forcedBranch) window.localStorage.setItem("ember-oak-admin-branch", activeBranchId);
+  }, [activeBranchId, forcedBranch]);
 
   useEffect(() => {
     if (!forcedBranch) return;
@@ -397,7 +390,7 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
             ) : null}
           </div>
 
-          <div className="hidden">
+          <div>
             {!forcedBranch && branches.length > 0 ? (
               <div className={cn("w-full px-3", collapsed && "px-2")}>
                 <Select
@@ -439,6 +432,9 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
                     )}
                   </SelectTrigger>
                   <SelectContent align="start" side="bottom" sideOffset={6}>
+                    <SelectItem value="all" className="gap-2 py-2.5">
+                      <span className="font-semibold">All branches</span>
+                    </SelectItem>
                     {branches.map((b) => (
                       <SelectItem key={b.id} value={b.id} className="gap-2 py-2.5">
                         <div className="flex flex-col items-start leading-tight">
@@ -518,16 +514,6 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
           </nav>
 
           <div className="border-t border-border/60 p-3">
-            <Link
-              to="/"
-              className={cn(
-                "mb-2 flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground",
-                collapsed && "justify-center px-2",
-              )}
-            >
-              <ArrowLeft className="size-4" />
-              {!collapsed ? <span>Back to site</span> : null}
-            </Link>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -563,23 +549,13 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      navigate({ to: isMainAdmin ? "/admin/settings" : "/branch-manager/settings" })
-                    }
-                  >
-                    <UserIcon className="size-4" />
-                    <span>Profile &amp; settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setSearchOpen(true)}>
+                <DropdownMenuItem onSelect={() => setSearchOpen(true)}>
                     <SearchIcon className="size-4" />
                     <span>Quick search</span>
                     <span className="ml-auto rounded border border-border/70 bg-muted/40 px-1.5 text-[10px] text-muted-foreground">
                       ⌘K
                     </span>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -644,61 +620,7 @@ export function BranchShellProvider({ children }: { children: React.ReactNode })
               </Breadcrumb>
             </div>
 
-            <div className="flex flex-1 items-center justify-end gap-2 md:ml-auto md:flex-none">
-              <Button
-                variant="outline"
-                onClick={() => setSearchOpen(true)}
-                className={cn(
-                  "hidden w-full items-center justify-between rounded-2xl border border-border/70 bg-card/80 text-left text-sm shadow-sm md:inline-flex md:w-[260px]",
-                )}
-              >
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  <SearchIcon className="size-4" /> Search…
-                </span>
-                <span className="rounded-md border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  ⌘K
-                </span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSearchOpen(true)}
-                className="rounded-full md:hidden"
-              >
-                <SearchIcon className="size-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative rounded-full text-muted-foreground hover:text-foreground"
-              >
-                <Bell className="size-5" />
-                <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-gradient-ember shadow-sm" />
-                <span className="sr-only">Notifications</span>
-              </Button>
-              <div className="md:hidden">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-full">
-                      <UserIcon className="size-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel className="text-sm">{adminUser.name}</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        logoutAdmin();
-                        navigate({ to: "/login" });
-                      }}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <LogOut className="size-4" /> Sign out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
+            <div className="flex flex-1 items-center justify-end gap-2 md:ml-auto md:flex-none" />
           </header>
 
           <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 md:px-8 md:py-8">

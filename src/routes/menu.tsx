@@ -259,6 +259,33 @@ function detectCategory(text: string) {
   return "other";
 }
 
+function normalizeCategory(category: string) {
+  const normalized = category.toLowerCase().trim();
+
+  switch (normalized) {
+    case "drink":
+    case "drinks":
+      return "drinks";
+    case "dessert":
+    case "desserts":
+      return "desserts";
+    case "main":
+    case "mains":
+      return "main";
+    case "side":
+    case "sides":
+      return "side";
+    default:
+      return normalized;
+  }
+}
+
+function uniqueDishes(dishes: Dish[]) {
+  return Array.from(
+    new Map(dishes.map((dish) => [dish.id, dish])).values(),
+  );
+}
+
 
 // =====================================================
 // CONVERT API ITEM → DISH
@@ -287,7 +314,7 @@ function convertMenuItem(
   // "Sandwiches" → "sandwiches"
 
   const categoryId = item.category
-    ? item.category.toLowerCase().trim()
+    ? normalizeCategory(item.category)
     : detectCategory(
         `${name} ${item.description || ""}`
       );
@@ -330,7 +357,7 @@ function convertMenuItem(
 function MenuPage() {
   const { selectedBranchId, selectBranch } = useStore();
   const [branchOptions, setBranchOptions] = useState<ApiBranch[]>([]);
-  const [branchSelectionRequired, setBranchSelectionRequired] = useState(true);
+  const [branchSelectionRequired, setBranchSelectionRequired] = useState(!selectedBranchId);
   const [menu, setMenu] = useState<Dish[]>([]);
 
   const [query, setQuery] = useState("");
@@ -368,7 +395,7 @@ function MenuPage() {
 
 
         const response = await fetch(
-          "http://127.0.0.1:8000/api/menu"
+          `http://127.0.0.1:8000/api/menu?branch_id=${encodeURIComponent(selectedBranchId ?? "")}`
         );
 
 
@@ -408,7 +435,7 @@ function MenuPage() {
             )
         );
 
-        setMenu(converted);
+        setMenu(uniqueDishes(converted));
       } catch (err) {
         console.error(
           "MENU ERROR:",
@@ -428,7 +455,7 @@ function MenuPage() {
 
 
     loadMenu();
-  }, []);
+  }, [selectedBranchId]);
 
   // =====================================================
   // FILTER AND SORT
@@ -917,7 +944,9 @@ function MenuPage() {
                                 text-lg
                               "
                             >
-                              {dish.name}
+                              <Link to="/dish/$id" params={{ id: dish.id }}>
+                                {dish.name}
+                              </Link>
                             </h2>
 
 

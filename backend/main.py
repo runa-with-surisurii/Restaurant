@@ -101,7 +101,7 @@ def health():
 # ============================================================
 
 @app.get("/api/menu")
-def get_menu():
+def get_menu(branch_id: str | None = None):
 
     menu_collection = db["menu_items"]
     price_collection = db["menuitem"]
@@ -133,7 +133,7 @@ def get_menu():
 
     items = list(
         menu_collection.find(
-            {},
+            {"branch_id": branch_id} if branch_id else {},
             {
                 "_id":0
             }
@@ -277,6 +277,10 @@ def get_menu_categories():
         {"id": str(value).lower(), "name": str(value), "emoji": "🍴"}
         for value in values if value
     ]
+
+@app.get("/api/menu/{branch_id}")
+def get_menu_by_branch(branch_id: str):
+    return get_menu(branch_id)
 
 # ============================================================
 # OTHER DATA
@@ -771,6 +775,41 @@ def admin_dashboard():
         ]
     }
 
+@app.get("/api/admin/branch-performance")
+def branch_performance():
+    branches = list(db["branches"].find({}, {"_id": 0}))
+    orders = list(db["orders"].find({}, {"_id": 0}))
+    performance = []
+    for branch in branches:
+        branch_id = branch.get("branch_id")
+        branch_orders = [
+            order for order in orders
+            if (order.get("branchId") or order.get("branch_id")) == branch_id
+        ]
+        active_orders = [order for order in branch_orders if order.get("status") not in {"cancelled", "Cancelled"}]
+        revenue = sum(float(order.get("total_amount", order.get("total", 0)) or 0) for order in active_orders)
+        completed = sum(1 for order in active_orders if str(order.get("status", "")).lower() in {"completed", "confirmed"})
+        average_order = revenue / len(active_orders) if active_orders else 0
+        performance.append({
+            "branchId": branch_id,
+            "branchName": branch.get("branch_name", "").strip(),
+            "city": branch.get("city", "").strip(),
+            "orders": len(active_orders),
+            "completedOrders": completed,
+            "revenue": round(revenue, 2),
+            "averageOrder": round(average_order, 2),
+            "performanceScore": 0,
+        })
+    max_orders = max((item["orders"] for item in performance), default=1)
+    max_revenue = max((item["revenue"] for item in performance), default=1)
+    for item in performance:
+        completion_rate = item["completedOrders"] / item["orders"] if item["orders"] else 0
+        item["performanceScore"] = round(
+            100 * (0.4 * item["orders"] / max_orders + 0.4 * item["revenue"] / max_revenue + 0.2 * completion_rate),
+            1,
+        )
+    return sorted(performance, key=lambda item: item["performanceScore"], reverse=True)
+
 class LoginRequest(BaseModel):
     username:str
     password:str
@@ -778,17 +817,38 @@ class LoginRequest(BaseModel):
 @app.post("/api/login")
 def login(data:LoginRequest):
 
-    if data.username.strip().lower() == "customer" and data.password == "c1":
+    customer_accounts = {
+        "customer1": "BR001",
+        "customer2": "BR002",
+        "customer3": "BR003",
+        "customer4": "BR004",
+    }
+    username = data.username.strip().lower()
+    if username in customer_accounts and data.password == f"c{username[-1]}":
         return {
             "success": True,
             "user": {
-                "_id": "customer",
-                "username": "customer",
-                "name": "Customer",
+                "_id": username,
+                "username": username,
+                "name": f"Customer {username[-1]}",
                 "phone": "",
                 "role": "customer",
+                "branchId": customer_accounts[username],
             },
         }
+
+    manager_accounts = {
+        "branch1": ("b1", "BR001", "Hlaing Taste Manager"),
+        "branch2": ("b2", "BR002", "Downtown Taste Manager"),
+        "branch3": ("b3", "BR003", "Sanchaung Kitchen Manager"),
+        "branch4": ("b4", "BR004", "Bahan Kitchen Manager"),
+    }
+    if username in manager_accounts and data.password == manager_accounts[username][0]:
+        password, branch_id, name = manager_accounts[username]
+        return {"success": True, "user": {"_id": username, "username": username, "name": name, "phone": "", "role": "branch_manager", "branchId": branch_id}}
+
+    if username == "admin" and data.password == "mainadmin":
+        return {"success": True, "user": {"_id": "admin", "username": "admin", "name": "Main Admin", "phone": "", "role": "main_admin"}}
 
     user = db["users"].find_one(
         {

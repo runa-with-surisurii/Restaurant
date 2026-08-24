@@ -53,7 +53,7 @@ export function getUnauthorizedRedirect(role?: UserRole | string | null, pathnam
 
 
   if (pathname?.startsWith("/branch-manager")) {
-    if (role !== "branch_manager") {
+    if (role !== "branch_manager" && role !== "main_admin") {
 
       return "/";
 
@@ -68,6 +68,6 @@ export function getUnauthorizedRedirect(role?: UserRole | string | null, pathnam
 }
 
 export function isAuthEntryRoute(pathname: string) {
-  return pathname === "/login" || pathname === "/signup" || pathname === "/register";
+  return pathname === "/login" || pathname === "/admin/login" || pathname === "/signup" || pathname === "/register";
 
 }

@@ -1,51 +1,201 @@
-menu_id,menu_name,category,price
-M001,Classic Cheeseburger,Burgers,6.05
-M002,Double Beef Burger,Burgers,6.74
-M003,Bacon BBQ Burger,Burgers,13.14
-M004,Veggie Burger,Burgers,7.15
-M005,Spicy Chicken Burger,Chicken,23.02
-M006,Crispy Chicken Burger,Chicken,5.76
-M007,Grilled Chicken Sandwich,Chicken,15.72
-M008,Chicken Nuggets (6pc),Chicken,11.64
-M009,Chicken Nuggets (10pc),Chicken,22.04
-M010,Chicken Tenders (3pc),Chicken,8.19
-M011,Chicken Wrap,Sandwiches & Wraps,11.74
-M012,Fish Fillet Sandwich,Sandwiches & Wraps,11.68
-M013,Turkey Club Sandwich,Sandwiches & Wraps,9.9
-M014,BLT Sandwich,Sandwiches & Wraps,5.03
-M015,Steak & Cheese Sub,Sandwiches & Wraps,13.73
-M016,French Fries (Small),Sides,6.75
-M017,French Fries (Large),Sides,16.95
-M018,Onion Rings,Sides,6.4
-M019,Mozzarella Sticks,Sides,11.31
-M020,Coleslaw,Sides,13.97
-M021,Mashed Potatoes,Sides,23.11
-M022,Hash Browns,Sides,6.86
-M023,Garden Salad,Salads,7.84
-M024,Caesar Salad,Salads,20.8
-M025,Grilled Chicken Salad,Salads,5.42
-M026,Cola (Small),Drinks,23.22
-M027,Cola (Medium),Drinks,16.47
-M028,Cola (Large),Drinks,10.31
-M029,Lemonade,Drinks,21.76
-M030,Iced Tea,Drinks,20.38
-M031,Bottled Water,Drinks,11.87
-M032,Orange Juice,Drinks,21.03
-M033,Milkshake - Chocolate,Drinks,9.14
-M034,Milkshake - Vanilla,Drinks,17.18
-M035,Milkshake - Strawberry,Drinks,15.54
-M036,Iced Coffee,Drinks,21.19
-M037,Hot Coffee,Drinks,11.31
-M038,Apple Pie,Desserts,12.96
-M039,Chocolate Chip Cookie,Desserts,20.39
-M040,Soft Serve Ice Cream,Desserts,15.26
-M041,Sundae - Chocolate,Desserts,18.7
-M042,Sundae - Caramel,Desserts,17.77
-M043,Donut,Desserts,18.33
-M044,Breakfast Muffin,Breakfast,22.8
-M045,Egg & Cheese Biscuit,Breakfast,14.72
-M046,Pancakes,Breakfast,18.37
-M047,Breakfast Burrito,Breakfast,12.49
-M048,Kids Meal - Burger,Combos,5.64
-M049,Kids Meal - Nuggets,Combos,20.08
-M050,Value Combo Meal,Combos,8.63
+menu_id,branch_id,menu_name,category,price,cost_price
+M001,BR001,Classic Cheeseburger,Dessert,5.79,1.8
+M002,BR001,Double Beef Burger,Main,6.59,2.1
+M003,BR001,Bacon BBQ Burger,Main,7.39,2.4
+M004,BR001,Veggie Burger,Main,8.19,2.7
+M005,BR001,Spicy Chicken Burger,Main,8.99,3.0
+M006,BR001,Crispy Chicken Burger,Main,9.79,3.3
+M007,BR001,Grilled Chicken Sandwich,Main,10.59,3.6
+M008,BR001,Chicken Nuggets (6pc),Dessert,11.39,3.9
+M009,BR001,Chicken Nuggets (10pc),Dessert,12.19,4.2
+M010,BR001,Chicken Tenders (3pc),Dessert,12.99,1.5
+M011,BR001,Chicken Wrap,Main,13.79,1.8
+M012,BR001,Fish Fillet Sandwich,Main,14.59,2.1
+M013,BR001,Turkey Club Sandwich,Main,15.39,2.4
+M014,BR001,BLT Sandwich,Main,16.19,2.7
+M015,BR001,Steak & Cheese Sub,Main,4.99,3.0
+M016,BR001,French Fries (Small),Side,5.79,3.3
+M017,BR001,French Fries (Large),Side,6.59,3.6
+M018,BR001,Onion Rings,Side,7.39,3.9
+M019,BR001,Mozzarella Sticks,Side,8.19,4.2
+M020,BR001,Coleslaw,Side,8.99,1.5
+M021,BR001,Mashed Potatoes,Side,9.79,1.8
+M022,BR001,Hash Browns,Side,10.59,2.1
+M023,BR001,Garden Salad,Side,11.39,2.4
+M024,BR001,Caesar Salad,Side,12.19,2.7
+M025,BR001,Grilled Chicken Salad,Side,12.99,3.0
+M026,BR001,Cola (Small),Drink,13.79,3.3
+M027,BR001,Cola (Medium),Drink,14.59,3.6
+M028,BR001,Cola (Large),Drink,15.39,3.9
+M029,BR001,Lemonade,Drink,16.19,4.2
+M030,BR001,Iced Tea,Drink,4.99,1.5
+M031,BR001,Bottled Water,Drink,5.79,1.8
+M032,BR001,Orange Juice,Drink,6.59,2.1
+M033,BR001,Milkshake - Chocolate,Drink,7.39,2.4
+M034,BR001,Milkshake - Vanilla,Drink,8.19,2.7
+M035,BR001,Milkshake - Strawberry,Drink,8.99,3.0
+M036,BR001,Iced Coffee,Drink,9.79,3.3
+M037,BR001,Hot Coffee,Drink,10.59,3.6
+M038,BR001,Apple Pie,Dessert,11.39,3.9
+M039,BR001,Chocolate Chip Cookie,Dessert,12.19,4.2
+M040,BR001,Soft Serve Ice Cream,Dessert,12.99,1.5
+M041,BR001,Sundae - Chocolate,Dessert,13.79,1.8
+M042,BR001,Sundae - Caramel,Dessert,14.59,2.1
+M043,BR001,Donut,Dessert,15.39,2.4
+M044,BR001,Breakfast Muffin,Dessert,16.19,2.7
+M045,BR001,Egg & Cheese Biscuit,Dessert,4.99,3.0
+M046,BR001,Pancakes,Dessert,5.79,3.3
+M047,BR001,Breakfast Burrito,Dessert,6.59,3.6
+M048,BR001,Kids Meal - Burger,Main,7.39,3.9
+M049,BR001,Kids Meal - Nuggets,Dessert,8.19,4.2
+M050,BR001,Value Combo Meal,Dessert,8.99,1.5
+M001,BR002,Classic Cheeseburger,Dessert,5.79,1.8
+M002,BR002,Double Beef Burger,Main,6.59,2.1
+M003,BR002,Bacon BBQ Burger,Main,7.39,2.4
+M004,BR002,Veggie Burger,Main,8.19,2.7
+M005,BR002,Spicy Chicken Burger,Main,8.99,3.0
+M006,BR002,Crispy Chicken Burger,Main,9.79,3.3
+M007,BR002,Grilled Chicken Sandwich,Main,10.59,3.6
+M008,BR002,Chicken Nuggets (6pc),Dessert,11.39,3.9
+M009,BR002,Chicken Nuggets (10pc),Dessert,12.19,4.2
+M010,BR002,Chicken Tenders (3pc),Dessert,12.99,1.5
+M011,BR002,Chicken Wrap,Main,13.79,1.8
+M012,BR002,Fish Fillet Sandwich,Main,14.59,2.1
+M013,BR002,Turkey Club Sandwich,Main,15.39,2.4
+M014,BR002,BLT Sandwich,Main,16.19,2.7
+M015,BR002,Steak & Cheese Sub,Main,4.99,3.0
+M016,BR002,French Fries (Small),Side,5.79,3.3
+M017,BR002,French Fries (Large),Side,6.59,3.6
+M018,BR002,Onion Rings,Side,7.39,3.9
+M019,BR002,Mozzarella Sticks,Side,8.19,4.2
+M020,BR002,Coleslaw,Side,8.99,1.5
+M021,BR002,Mashed Potatoes,Side,9.79,1.8
+M022,BR002,Hash Browns,Side,10.59,2.1
+M023,BR002,Garden Salad,Side,11.39,2.4
+M024,BR002,Caesar Salad,Side,12.19,2.7
+M025,BR002,Grilled Chicken Salad,Side,12.99,3.0
+M026,BR002,Cola (Small),Drink,13.79,3.3
+M027,BR002,Cola (Medium),Drink,14.59,3.6
+M028,BR002,Cola (Large),Drink,15.39,3.9
+M029,BR002,Lemonade,Drink,16.19,4.2
+M030,BR002,Iced Tea,Drink,4.99,1.5
+M031,BR002,Bottled Water,Drink,5.79,1.8
+M032,BR002,Orange Juice,Drink,6.59,2.1
+M033,BR002,Milkshake - Chocolate,Drink,7.39,2.4
+M034,BR002,Milkshake - Vanilla,Drink,8.19,2.7
+M035,BR002,Milkshake - Strawberry,Drink,8.99,3.0
+M036,BR002,Iced Coffee,Drink,9.79,3.3
+M037,BR002,Hot Coffee,Drink,10.59,3.6
+M038,BR002,Apple Pie,Dessert,11.39,3.9
+M039,BR002,Chocolate Chip Cookie,Dessert,12.19,4.2
+M040,BR002,Soft Serve Ice Cream,Dessert,12.99,1.5
+M041,BR002,Sundae - Chocolate,Dessert,13.79,1.8
+M042,BR002,Sundae - Caramel,Dessert,14.59,2.1
+M043,BR002,Donut,Dessert,15.39,2.4
+M044,BR002,Breakfast Muffin,Dessert,16.19,2.7
+M045,BR002,Egg & Cheese Biscuit,Dessert,4.99,3.0
+M046,BR002,Pancakes,Dessert,5.79,3.3
+M047,BR002,Breakfast Burrito,Dessert,6.59,3.6
+M048,BR002,Kids Meal - Burger,Main,7.39,3.9
+M049,BR002,Kids Meal - Nuggets,Dessert,8.19,4.2
+M050,BR002,Value Combo Meal,Dessert,8.99,1.5
+M001,BR003,Classic Cheeseburger,Dessert,5.79,1.8
+M002,BR003,Double Beef Burger,Main,6.59,2.1
+M003,BR003,Bacon BBQ Burger,Main,7.39,2.4
+M004,BR003,Veggie Burger,Main,8.19,2.7
+M005,BR003,Spicy Chicken Burger,Main,8.99,3.0
+M006,BR003,Crispy Chicken Burger,Main,9.79,3.3
+M007,BR003,Grilled Chicken Sandwich,Main,10.59,3.6
+M008,BR003,Chicken Nuggets (6pc),Dessert,11.39,3.9
+M009,BR003,Chicken Nuggets (10pc),Dessert,12.19,4.2
+M010,BR003,Chicken Tenders (3pc),Dessert,12.99,1.5
+M011,BR003,Chicken Wrap,Main,13.79,1.8
+M012,BR003,Fish Fillet Sandwich,Main,14.59,2.1
+M013,BR003,Turkey Club Sandwich,Main,15.39,2.4
+M014,BR003,BLT Sandwich,Main,16.19,2.7
+M015,BR003,Steak & Cheese Sub,Main,4.99,3.0
+M016,BR003,French Fries (Small),Side,5.79,3.3
+M017,BR003,French Fries (Large),Side,6.59,3.6
+M018,BR003,Onion Rings,Side,7.39,3.9
+M019,BR003,Mozzarella Sticks,Side,8.19,4.2
+M020,BR003,Coleslaw,Side,8.99,1.5
+M021,BR003,Mashed Potatoes,Side,9.79,1.8
+M022,BR003,Hash Browns,Side,10.59,2.1
+M023,BR003,Garden Salad,Side,11.39,2.4
+M024,BR003,Caesar Salad,Side,12.19,2.7
+M025,BR003,Grilled Chicken Salad,Side,12.99,3.0
+M026,BR003,Cola (Small),Drink,13.79,3.3
+M027,BR003,Cola (Medium),Drink,14.59,3.6
+M028,BR003,Cola (Large),Drink,15.39,3.9
+M029,BR003,Lemonade,Drink,16.19,4.2
+M030,BR003,Iced Tea,Drink,4.99,1.5
+M031,BR003,Bottled Water,Drink,5.79,1.8
+M032,BR003,Orange Juice,Drink,6.59,2.1
+M033,BR003,Milkshake - Chocolate,Drink,7.39,2.4
+M034,BR003,Milkshake - Vanilla,Drink,8.19,2.7
+M035,BR003,Milkshake - Strawberry,Drink,8.99,3.0
+M036,BR003,Iced Coffee,Drink,9.79,3.3
+M037,BR003,Hot Coffee,Drink,10.59,3.6
+M038,BR003,Apple Pie,Dessert,11.39,3.9
+M039,BR003,Chocolate Chip Cookie,Dessert,12.19,4.2
+M040,BR003,Soft Serve Ice Cream,Dessert,12.99,1.5
+M041,BR003,Sundae - Chocolate,Dessert,13.79,1.8
+M042,BR003,Sundae - Caramel,Dessert,14.59,2.1
+M043,BR003,Donut,Dessert,15.39,2.4
+M044,BR003,Breakfast Muffin,Dessert,16.19,2.7
+M045,BR003,Egg & Cheese Biscuit,Dessert,4.99,3.0
+M046,BR003,Pancakes,Dessert,5.79,3.3
+M047,BR003,Breakfast Burrito,Dessert,6.59,3.6
+M048,BR003,Kids Meal - Burger,Main,7.39,3.9
+M049,BR003,Kids Meal - Nuggets,Dessert,8.19,4.2
+M050,BR003,Value Combo Meal,Dessert,8.99,1.5
+M001,BR004,Classic Cheeseburger,Dessert,5.79,1.8
+M002,BR004,Double Beef Burger,Main,6.59,2.1
+M003,BR004,Bacon BBQ Burger,Main,7.39,2.4
+M004,BR004,Veggie Burger,Main,8.19,2.7
+M005,BR004,Spicy Chicken Burger,Main,8.99,3.0
+M006,BR004,Crispy Chicken Burger,Main,9.79,3.3
+M007,BR004,Grilled Chicken Sandwich,Main,10.59,3.6
+M008,BR004,Chicken Nuggets (6pc),Dessert,11.39,3.9
+M009,BR004,Chicken Nuggets (10pc),Dessert,12.19,4.2
+M010,BR004,Chicken Tenders (3pc),Dessert,12.99,1.5
+M011,BR004,Chicken Wrap,Main,13.79,1.8
+M012,BR004,Fish Fillet Sandwich,Main,14.59,2.1
+M013,BR004,Turkey Club Sandwich,Main,15.39,2.4
+M014,BR004,BLT Sandwich,Main,16.19,2.7
+M015,BR004,Steak & Cheese Sub,Main,4.99,3.0
+M016,BR004,French Fries (Small),Side,5.79,3.3
+M017,BR004,French Fries (Large),Side,6.59,3.6
+M018,BR004,Onion Rings,Side,7.39,3.9
+M019,BR004,Mozzarella Sticks,Side,8.19,4.2
+M020,BR004,Coleslaw,Side,8.99,1.5
+M021,BR004,Mashed Potatoes,Side,9.79,1.8
+M022,BR004,Hash Browns,Side,10.59,2.1
+M023,BR004,Garden Salad,Side,11.39,2.4
+M024,BR004,Caesar Salad,Side,12.19,2.7
+M025,BR004,Grilled Chicken Salad,Side,12.99,3.0
+M026,BR004,Cola (Small),Drink,13.79,3.3
+M027,BR004,Cola (Medium),Drink,14.59,3.6
+M028,BR004,Cola (Large),Drink,15.39,3.9
+M029,BR004,Lemonade,Drink,16.19,4.2
+M030,BR004,Iced Tea,Drink,4.99,1.5
+M031,BR004,Bottled Water,Drink,5.79,1.8
+M032,BR004,Orange Juice,Drink,6.59,2.1
+M033,BR004,Milkshake - Chocolate,Drink,7.39,2.4
+M034,BR004,Milkshake - Vanilla,Drink,8.19,2.7
+M035,BR004,Milkshake - Strawberry,Drink,8.99,3.0
+M036,BR004,Iced Coffee,Drink,9.79,3.3
+M037,BR004,Hot Coffee,Drink,10.59,3.6
+M038,BR004,Apple Pie,Dessert,11.39,3.9
+M039,BR004,Chocolate Chip Cookie,Dessert,12.19,4.2
+M040,BR004,Soft Serve Ice Cream,Dessert,12.99,1.5
+M041,BR004,Sundae - Chocolate,Dessert,13.79,1.8
+M042,BR004,Sundae - Caramel,Dessert,14.59,2.1
+M043,BR004,Donut,Dessert,15.39,2.4
+M044,BR004,Breakfast Muffin,Dessert,16.19,2.7
+M045,BR004,Egg & Cheese Biscuit,Dessert,4.99,3.0
+M046,BR004,Pancakes,Dessert,5.79,3.3
+M047,BR004,Breakfast Burrito,Dessert,6.59,3.6
+M048,BR004,Kids Meal - Burger,Main,7.39,3.9
+M049,BR004,Kids Meal - Nuggets,Dessert,8.19,4.2
+M050,BR004,Value Combo Meal,Dessert,8.99,1.5

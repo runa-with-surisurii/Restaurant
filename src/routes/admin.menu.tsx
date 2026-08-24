@@ -48,6 +48,33 @@ const empty = (): Dish => ({
   calories: 500,
 });
 
+function normalizeCategory(category: string) {
+  const normalized = category.toLowerCase().trim();
+
+  switch (normalized) {
+    case "drink":
+    case "drinks":
+      return "drinks";
+    case "dessert":
+    case "desserts":
+      return "desserts";
+    case "main":
+    case "mains":
+      return "main";
+    case "side":
+    case "sides":
+      return "side";
+    default:
+      return normalized;
+  }
+}
+
+function uniqueDishes(dishes: Dish[]) {
+  return Array.from(
+    new Map(dishes.map((dish) => [dish.id, dish])).values(),
+  );
+}
+
 function MenuAdmin() {
   const { adminUser, dishesState, addDish, updateDish } = useStore();
   const navigate = useNavigate();
@@ -70,7 +97,7 @@ function MenuAdmin() {
     fetch("http://127.0.0.1:8000/api/menu")
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Unable to load menu")))
       .then((items: Array<Record<string, unknown>>) => {
-        setCatalog(items.map((item, index) => ({
+        setCatalog(uniqueDishes(items.map((item, index) => ({
           id: String(item.id ?? item.menu_id ?? index),
           name: String(item.name ?? item.menu_name ?? "Unnamed menu item"),
           description: String(item.description ?? ""),
@@ -78,13 +105,13 @@ function MenuAdmin() {
           costPrice: Number(item.costPrice ?? item.cost_price ?? 0),
           availableStatus: item.availableStatus === "Unavailable" || item.available_status === "Unavailable" ? "Unavailable" : "Available",
           image: String(item.image ?? ""),
-          categoryId: String(item.category ?? "other").toLowerCase(),
+          categoryId: normalizeCategory(String(item.category ?? "other")),
           rating: 4.5,
           reviewCount: 0,
           tags: [],
           prepTime: 15,
           calories: 0,
-        })));
+        }))));
       })
       .catch(() => setCatalog(dishesState));
   }, [dishesState]);

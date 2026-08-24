@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
 import { getCategory } from "@/lib/data";
+import { useBranchShell } from "@/components/branch-admin/BranchShell";
 
 export const Route = createFileRoute("/admin/menu-availability")({
   head: () => ({ meta: [{ title: "Menu Availability — Admin" }, { name: "robots", content: "noindex" }] }),
@@ -16,7 +17,8 @@ export function AvailabilityAdmin() {
   const { dishesState, branchesState, adminUser, isAvailable, toggleAvailability } = useStore();
   const isManager = adminUser?.role === "branch_manager";
   const forced = isManager ? adminUser?.branchId : undefined;
-  const [branchId, setBranchId] = useState<string>(forced ?? branchesState[0]?.id ?? "");
+  const { activeBranchId, setActiveBranchId } = useBranchShell();
+  const [branchId, setBranchId] = useState<string>(forced ?? activeBranchId);
   const active = forced ?? branchId;
 
   return (
@@ -29,7 +31,7 @@ export function AvailabilityAdmin() {
           </p>
         </div>
         {!isManager && (
-          <Select value={branchId} onValueChange={setBranchId}>
+          <Select value={branchId} onValueChange={(value) => { setBranchId(value); setActiveBranchId(value); }}>
             <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               {branchesState.map((b) => (

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { ImageIcon } from "lucide-react";
+import { useBranchShell } from "@/components/branch-admin/BranchShell";
 
 export const Route = createFileRoute("/branch-manager/orders")({
 
@@ -25,6 +26,7 @@ function BranchManagerOrders(){
 
 
   const { adminUser } = useStore();
+  const { activeBranchId } = useBranchShell();
 
 
   const [orders,setOrders] = useState<any[]>([]);
@@ -33,33 +35,37 @@ function BranchManagerOrders(){
 
 
 
-  const branchId = adminUser?.branchId;
+  const branchId = adminUser?.role === "branch_manager" ? adminUser.branchId : activeBranchId;
 
 
 
   useEffect(()=>{
 
 
-    if(!branchId) return;
-
-
-    fetch(
-      `http://127.0.0.1:8000/api/orders/${branchId}`
-    )
-
-    .then(res=>res.json())
-
-    .then(data=>{
-
-      setOrders(data);
-
-    })
-
-    .finally(()=>{
-
+    if(!branchId){
       setLoading(false);
+      return;
+    }
 
-    });
+
+    async function loadOrders(){
+      try {
+        const response = await fetch(
+          `http://127.0.0.1:8000/api/orders/${branchId}`
+        );
+        if (!response.ok) throw new Error("Unable to load branch orders");
+        const data = await response.json();
+        setOrders(Array.isArray(data) ? data : []);
+      } catch {
+        setOrders([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadOrders();
+    const timer = setInterval(loadOrders, 5000);
+    return () => clearInterval(timer);
 
 
   },[branchId]);
@@ -82,26 +88,10 @@ function BranchManagerOrders(){
     );
 
 
-    setOrders(prev=>
-
-      prev.map(order=>
-
-        order._id===id
-
-        ?
-
-        {
-          ...order,
-          status:"confirmed"
-        }
-
-        :
-
-        order
-
-      )
-
+    const response = await fetch(
+      `http://127.0.0.1:8000/api/orders/${branchId}`
     );
+    setOrders(await response.json());
 
   }
 
@@ -145,9 +135,14 @@ function BranchManagerOrders(){
 
 
         <div className="divide-y">
-          {orders.map((order) => (
+          {orders.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">No orders for this branch yet.</div>
+          ) : orders.map((order) => {
+            const orderId = order.id || order._id;
+
+            return (
 <div
-key={order._id}
+key={orderId}
 className="
 p-5
 space-y-4
@@ -167,7 +162,7 @@ items-start
 
 <div className="font-semibold">
 
-#{order._id.slice(-6)}
+#{String(orderId).slice(-6)}
 
 </div>
 
@@ -210,7 +205,7 @@ order.status==="pending"
 
 <button
 
-onClick={()=>confirmOrder(order._id)}
+onClick={()=>confirmOrder(orderId)}
 
 className="
 rounded-lg
@@ -331,7 +326,7 @@ className="text-muted-foreground"
 
 <p className="font-semibold">
 
-{item.name}
+{item.menu_name || item.name || "Unknown Menu"}
 
 </p>
 
@@ -348,7 +343,7 @@ Qty:
 
 <p className="text-sm">
 
-${item.price}
+${item.unit_price || item.price || 0}
 
 </p>
 
@@ -388,7 +383,7 @@ Total:
 
 {" "}
 
-${order.total}
+${order.total_amount || order.total || 0}
 
 
 </div>
@@ -397,7 +392,8 @@ ${order.total}
 
 </div>
 
-        ))}
+        )
+          })}
 
 
         </div>

@@ -24,6 +24,7 @@ export type User = {
   name: string;
   email: string;
   phone?: string;
+  branchId?: string;
 };
 
 export type CustomerAccount = {
@@ -195,39 +196,44 @@ const STAFF_CREDENTIALS = [
     username: "branch1",
     password: "b1",
     role: "branch_manager" as const,
-    branchId: "46673",
-    name: "Berkeley Branch Manager",
+    branchId: "BR001",
+    name: "Hlaing Taste Manager",
   },
 
   {
     username: "branch2",
     password: "b2",
     role: "branch_manager" as const,
-    branchId: "4904",
-    name: "Shattuck Branch Manager",
+    branchId: "BR002",
+    name: "Downtown Taste Manager",
   },
 
   {
     username: "branch3",
     password: "b3",
     role: "branch_manager" as const,
-    branchId: "12631",
-    name: "Ridgewood Branch Manager",
+    branchId: "BR003",
+    name: "Sanchaung Kitchen Manager",
   },
 
   {
     username: "branch4",
     password: "b4",
     role: "branch_manager" as const,
-    branchId: "20974",
-    name: "Elmhurst Branch Manager",
+    branchId: "BR004",
+    name: "Bahan Kitchen Manager",
   },
 ];
-const CUSTOMER_CREDENTIALS = { username: "customer", password: "c1" };
+const CUSTOMER_CREDENTIALS = [
+  { username: "customer1", password: "c1", branchId: "BR001" },
+  { username: "customer2", password: "c2", branchId: "BR002" },
+  { username: "customer3", password: "c3", branchId: "BR003" },
+  { username: "customer4", password: "c4", branchId: "BR004" },
+];
 const seededReviews: Review[] = [
   {
     id: "r1",
-    branchId: "br-westside",
+    branchId: "BR003",
     rating: 5,
     author: "Sofia M.",
     title: "Our date-night go-to",
@@ -238,7 +244,7 @@ const seededReviews: Review[] = [
   },
   {
     id: "r2",
-    branchId: "br-downtown",
+    branchId: "BR002",
     rating: 4,
     author: "Jordan P.",
     title: "Great lunch menu",
@@ -249,7 +255,7 @@ const seededReviews: Review[] = [
   },
   {
     id: "r3",
-    branchId: "br-harbor",
+    branchId: "BR001",
     rating: 3,
     author: "Taylor R.",
     title: "Good but inconsistent",
@@ -260,7 +266,7 @@ const seededReviews: Review[] = [
   },
   {
     id: "r4",
-    branchId: "br-westside",
+    branchId: "BR003",
     rating: 2,
     author: "Alex K.",
     title: "Long wait, forgotten order",
@@ -271,7 +277,7 @@ const seededReviews: Review[] = [
   },
   {
     id: "r5",
-    branchId: "br-downtown",
+    branchId: "BR002",
     rating: 5,
     author: "Priya S.",
     title: "Chef's tasting menu 👌",
@@ -285,7 +291,7 @@ const seededReviews: Review[] = [
   },
   {
     id: "r6",
-    branchId: "br-uptown",
+    branchId: "BR004",
     rating: 4,
     author: "Morgan L.",
     title: "Uptown is such a vibe",
@@ -296,7 +302,7 @@ const seededReviews: Review[] = [
   },
   {
     id: "r7",
-    branchId: "br-harbor",
+    branchId: "BR001",
     rating: 5,
     author: "Samir V.",
     title: "Waterfront + ribs",
@@ -307,7 +313,7 @@ const seededReviews: Review[] = [
   },
   {
     id: "r8",
-    branchId: "br-uptown",
+    branchId: "BR004",
     rating: 2,
     author: "Chris D.",
     title: "Wait staff seemed rushed",
@@ -495,9 +501,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       currentRole,
       isAuthenticated: Boolean(state.user || state.adminUser),
       authenticate: async (identifier, password) => {
-        if (identifier.trim().toLowerCase() === CUSTOMER_CREDENTIALS.username && password === CUSTOMER_CREDENTIALS.password) {
-          const user = { id: "customer", name: "Customer", email: "customer", phone: "" };
-          patch({ adminUser: null, user });
+        const customerAccount = CUSTOMER_CREDENTIALS.find(
+          (account) => account.username === identifier.trim().toLowerCase() && account.password === password,
+        );
+        if (customerAccount) {
+          const user = { id: customerAccount.username, name: `Customer ${customerAccount.branchId.slice(-1)}`, email: customerAccount.username, phone: "", branchId: customerAccount.branchId };
+          patch({ adminUser: null, user, selectedBranchId: customerAccount.branchId });
           return "customer";
         }
 

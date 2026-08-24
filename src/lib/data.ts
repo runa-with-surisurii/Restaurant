@@ -202,23 +202,23 @@ export const dishes: Dish[] = [
 
 export const branches: Branch[] = [
   {
-    id: "downtown",
-    name: "Downtown Flagship",
-    address: "48 Oak Lane",
-    city: "New York, NY",
-    phone: "(212) 555-0148",
+    id: "BR001",
+    name: "Hlaing Taste",
+    address: "Hlaing",
+    city: "Hlaing",
+    phone: "",
     hours: "11:00 – 23:00",
   },
   {
-    id: "harbor",
-    name: "Harbor Grill",
-    address: "12 Pier Road",
-    city: "Boston, MA",
-    phone: "(617) 555-0122",
+    id: "BR002",
+    name: "Downtown Taste",
+    address: "Kyauktada",
+    city: "Kyauktada",
+    phone: "",
     hours: "12:00 – 22:30",
   },
-  { id: "westside", name: "Westside Kitchen", address: "301 Sunset Blvd", city: "Los Angeles, CA", phone: "(310) 555-0181", hours: "11:30 – 00:00" },
-  { id: "riverfront", name: "Riverfront Roast", address: "77 Riverwalk", city: "Chicago, IL", phone: "(312) 555-0106", hours: "11:00 – 23:00" },
+  { id: "BR003", name: "Sanchaung Kitchen", address: "Sanchaung", city: "Sanchaung", phone: "", hours: "11:30 – 00:00" },
+  { id: "BR004", name: "Bahan Kitchen", address: "Bahan", city: "Bahan", phone: "", hours: "11:00 – 23:00" },
 ];
 
 export const promotions: Promotion[] = [

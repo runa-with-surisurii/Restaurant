@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/api/branch/sales-report/{branch_id}")
-def sales_report(branch_id: int):
+def sales_report(branch_id: str):
 
 
     # =====================================
@@ -144,7 +144,7 @@ def sales_report(branch_id: int):
 
                 {
 
-                    "StoreNumber": branch_id
+                    "StoreNumber": int(branch_id) if branch_id.isdigit() else -1
 
                 }
 
@@ -197,7 +197,7 @@ def sales_report(branch_id: int):
 
             {
 
-                "branchId": str(branch_id)
+                "branch_id": branch_id
 
             }
 

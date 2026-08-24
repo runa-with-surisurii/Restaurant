@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { useStore } from "@/lib/store";
 import { cn, formatCurrency } from "@/lib/utils";
+import { useBranchShell } from "@/components/branch-admin/BranchShell";
 
 export const Route = createFileRoute("/admin/sales-reports")({
   head: () => ({
@@ -20,7 +21,8 @@ export const Route = createFileRoute("/admin/sales-reports")({
 
 export function SalesReportPage() {
   const { orders, dishesState, adminUser, branchesState } = useStore();
-  const branchId = adminUser?.branchId ?? "all";
+  const { activeBranchId, section } = useBranchShell();
+  const branchId = adminUser?.branchId ?? (section === "chain" ? "all" : activeBranchId);
   const [range, setRange] = useState<"today" | "7d" | "30d" | "90d">("7d");
 
   const data = useMemo(() => {

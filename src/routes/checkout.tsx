@@ -62,6 +62,7 @@ const {
 const {
   selectedBranchId,
   user,
+  placeOrder,
 }=useStore();
 
 const selectedBranch = branches.find((branch) => branch.id === selectedBranchId);
@@ -250,6 +251,13 @@ data
 
 if(data.success){
 
+placeOrder({
+  items: items.map((item) => ({ dishId: item.dish.id, qty: item.quantity })),
+  total,
+  branchId: selectedBranchId,
+  mode: "dine_in",
+});
+
 
 toast.success(
 "Order created successfully"
@@ -263,7 +271,7 @@ clearCart();
 
 navigate({
 
-to:"/branch-manager",
+to:"/orders",
 
 replace:true
 

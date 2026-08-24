@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
+import { useBranchShell } from "@/components/branch-admin/BranchShell";
 
 import {
   ShoppingBag,
@@ -116,6 +117,8 @@ function BranchDashboard(){
 const {
   adminUser
 }=useStore();
+const { activeBranchId } = useBranchShell();
+const branchId = adminUser?.role === "branch_manager" ? adminUser.branchId : activeBranchId;
 
 
 
@@ -149,7 +152,7 @@ useEffect(()=>{
 
 
 
-if(!adminUser) return;
+if(!adminUser || !branchId) return;
 
 
 
@@ -171,7 +174,7 @@ fetch(
 
 fetch(
 
-`http://127.0.0.1:8000/api/branch/dashboard/${adminUser.branchId}`
+`http://127.0.0.1:8000/api/branch/dashboard/${branchId}`
 
 )
 
@@ -193,11 +196,11 @@ branches.find(
 
 (b:Branch)=>
 
-String(b.storeNumber)
+String(b.branchId ?? b.storeNumber)
 
 ===
 
-String(adminUser.branchId)
+String(branchId)
 
 );
 
@@ -261,7 +264,7 @@ setLoading(false);
 
 
 
-},[adminUser]);
+},[adminUser, branchId]);
 
 
 

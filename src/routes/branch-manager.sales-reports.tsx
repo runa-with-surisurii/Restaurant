@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
+import { useBranchShell } from "@/components/branch-admin/BranchShell";
 
 import {
   DollarSign,
@@ -116,6 +117,8 @@ function SalesReport(){
 
 
 const {adminUser}=useStore();
+const { activeBranchId } = useBranchShell();
+const branchId = adminUser?.role === "branch_manager" ? adminUser.branchId : activeBranchId;
 
 
 
@@ -136,7 +139,7 @@ useState(true);
 useEffect(()=>{
 
 
-if(!adminUser?.branchId)
+if(!branchId)
 return;
 
 
@@ -144,7 +147,7 @@ return;
 
 fetch(
 
-`http://127.0.0.1:8000/api/branch/sales-report/${adminUser.branchId}`
+`http://127.0.0.1:8000/api/branch/sales-report/${branchId}`
 
 )
 

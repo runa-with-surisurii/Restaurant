@@ -156,7 +156,7 @@ function AppSessionGate({ children }: { children: ReactNode }) {
   const { isAuthenticated, currentRole } = useStore();
 
   useEffect(() => {
-    const isAdminRoute = pathname.startsWith("/admin");
+    const isAdminRoute = pathname.startsWith("/admin") && pathname !== "/admin/login";
     const isLoginRoute = isAuthEntryRoute(pathname);
 
     // ==========================================

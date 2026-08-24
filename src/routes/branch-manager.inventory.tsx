@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useStore } from "@/lib/store";
+import { useBranchShell } from "@/components/branch-admin/BranchShell";
 
 
 export const Route = createFileRoute("/branch-manager/inventory")({
@@ -64,7 +66,9 @@ function BranchInventory(){
 
 
 
-  const branchId = 4904;
+  const { adminUser } = useStore();
+  const { activeBranchId } = useBranchShell();
+  const branchId = adminUser?.branchId ?? activeBranchId;
 
 
 
@@ -137,7 +141,7 @@ function BranchInventory(){
 
 
 
-  },[]);
+  },[branchId]);
 
 
 

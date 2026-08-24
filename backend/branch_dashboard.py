@@ -4,17 +4,57 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 
+def calculate_growth(branch_id: str):
+    today = datetime.now().date()
+    current_start = today - timedelta(days=7)
+    previous_start = today - timedelta(days=14)
+    current_sales = 0.0
+    previous_sales = 0.0
+
+    orders = db["orders"].find({
+        "$or": [
+            {"branchId": branch_id},
+            {"branchId": str(branch_id)},
+            {"branch_id": branch_id},
+            {"branch_id": str(branch_id)},
+        ]
+    })
+
+    for order in orders:
+        if order.get("status") != "confirmed":
+            continue
+
+        order_date = order.get("order_date")
+        if order_date:
+            try:
+                order_date = datetime.strptime(str(order_date), "%Y-%m-%d").date()
+            except ValueError:
+                continue
+        else:
+            order_date = order.get("confirmedAt") or order.get("createdAt") or order.get("created_at")
+            if isinstance(order_date, datetime):
+                order_date = order_date.date()
+            else:
+                continue
+
+        amount = float(order.get("total_amount", order.get("total", 0)) or 0)
+        if current_start <= order_date <= today:
+            current_sales += amount
+        elif previous_start <= order_date < current_start:
+            previous_sales += amount
+
+    if previous_sales == 0:
+        return 100 if current_sales > 0 else 0
+    return round(((current_sales - previous_sales) / previous_sales) * 100, 2)
+
 router = APIRouter()
 
 
 
 # =====================================================
 # BRANCH DASHBOARD
-# =====================================================
-
-
 @router.get("/api/branch/dashboard/{branch_id}")
-def branch_dashboard(branch_id:int):
+def branch_dashboard(branch_id:str):
 
 
     # ===============================
@@ -85,7 +125,6 @@ def branch_dashboard(branch_id:int):
     total_revenue = 0
 
 
-
     for order in all_orders:
 
 
@@ -149,10 +188,6 @@ def branch_dashboard(branch_id:int):
 
 
 
-
-
-
-
     # ===============================
     # WEEKLY GRAPH
     # ===============================
@@ -213,10 +248,6 @@ def branch_dashboard(branch_id:int):
 
 
 
-
-
-
-
     weekly_sales = []
 
 
@@ -224,7 +255,6 @@ def branch_dashboard(branch_id:int):
     days = [
 
         "Mon",
-
         "Tue",
 
         "Wed",
@@ -441,7 +471,7 @@ def branch_dashboard(branch_id:int):
 
         "growth":
 
-        0,
+        calculate_growth(branch_id),
 
 
 
@@ -462,7 +492,7 @@ def branch_dashboard(branch_id:int):
 # =====================================================
 
 @router.get("/api/dashboard/inventory-usage/{branch_id}")
-def inventory_usage(branch_id:int):
+def inventory_usage(branch_id:str):
 
 
     logs = list(
