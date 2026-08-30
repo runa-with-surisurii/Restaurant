@@ -146,14 +146,6 @@ export const branchManagerNav: BranchManagerNavItem[] = [
     description: "Revenue and sales analysis",
   },
   {
-    id: "branches",
-    to: "/admin/branches",
-    label: "Branches",
-    icon: Building2,
-    section: "chain",
-    description: "Manage branches",
-  },
-  {
     id: "menu-editor",
     to: "/admin/menu",
     label: "Menu Management",

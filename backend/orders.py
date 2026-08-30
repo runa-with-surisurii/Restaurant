@@ -78,6 +78,9 @@ def create_order(order:dict):
 
 
     items=[]
+    order_items=[]
+    branch_id = order.get("branchId") or order.get("branch_id")
+    total_amount = float(order.get("total", 0) or 0)
 
 
     for item in order.get("items",[]):
@@ -86,7 +89,7 @@ def create_order(order:dict):
         menu=None
 
 
-        dish_id=item.get("dishId")
+        dish_id=item.get("dishId") or item.get("menu_id")
 
 
 
@@ -99,6 +102,7 @@ def create_order(order:dict):
                     "$or": [
                         {"menu_id": dish_id},
                         {"MenuItemId": int(dish_id) if str(dish_id).isdigit() else -1},
+                        {"Description": str(dish_id)},
                     ]
                 })
 
@@ -140,64 +144,70 @@ def create_order(order:dict):
                 "/menu/default.png"
             )
 
+            item["menu_id"] = menu.get("menu_id") or menu.get("MenuItemId")
+
 
 
         items.append(item)
 
-
+        quantity = int(item.get("quantity", 1) or 1)
+        unit_price = float(item.get("price", 0) or 0)
+        subtotal = quantity * unit_price
+        order_items.append({
+            "menu_id": item.get("menu_id") or item.get("dishId") or item.get("menuItemId"),
+            "menu_name": item.get("name"),
+            "quantity": quantity,
+            "unit_price": unit_price,
+            "subtotal": subtotal,
+            "cost_price": item.get("costPrice", 0),
+        })
+        total_amount += subtotal
 
 
 
     order_data={
 
 
-        "branchId": order.get("branchId"),
-
-
+        "branchId": branch_id,
+        "branch_id": branch_id,
         "createdBy":
         order.get(
             "createdBy",
             "customer"
         ),
-
-
-        "items":
-        items,
-
-
-        "total":
-        order.get(
-            "total",
-            0
-        ),
-
-
-        "status":
-        "pending",
-
-
-        "createdAt":
-        datetime.now()
-
+        "items": items,
+        "total": total_amount,
+        "status": "pending",
+        "createdAt": datetime.now(),
     }
 
+    result = db["orders"].insert_one(order_data)
+    order_id = str(result.inserted_id)
 
-
-    result=db["orders"].insert_one(
-        order_data
+    db["orders"].update_one(
+        {"_id": result.inserted_id},
+        {"$set": {"order_id": order_id, "branch_id": branch_id, "branchId": branch_id}},
     )
 
-
+    for order_item in order_items:
+        db["order_items"].insert_one({
+            "order_id": order_id,
+            "orderItemId": "OI" + order_id[-6:],
+            "menu_id": order_item.get("menu_id"),
+            "menu_name": order_item.get("menu_name"),
+            "quantity": order_item.get("quantity", 1),
+            "unit_price": order_item.get("unit_price", 0),
+            "subtotal": order_item.get("subtotal", 0),
+            "cost_price": order_item.get("cost_price", 0),
+            "branch_id": branch_id,
+        })
 
     return {
 
 
         "success":True,
-
-
-        "orderId":
-        str(result.inserted_id)
-
+        "orderId": order_id,
+        "order_id": order_id,
     }
 
 
@@ -316,8 +326,50 @@ def confirm_order(order_id:str):
 
     branch_id=order.get(
         "branchId"
-    )
+    ) or order.get("branch_id")
 
+    if not order.get("order_id"):
+        db["orders"].update_one(
+            {"_id": order["_id"]},
+            {"$set": {"order_id": str(order["_id"])}}
+        )
+        order["order_id"] = str(order["_id"])
+
+    order_id_value = str(order.get("order_id") or order.get("_id"))
+
+    existing_order_items = list(db["order_items"].find({"order_id": order_id_value}, {"_id": 0}))
+    if not existing_order_items:
+        for item in order.get("items", []):
+            menu = None
+            dish_id = item.get("dishId") or item.get("menu_id")
+            if dish_id:
+                menu = db["menu_items"].find_one({
+                    "$or": [
+                        {"menu_id": dish_id},
+                        {"MenuItemId": int(dish_id) if str(dish_id).isdigit() else -1},
+                        {"Description": str(dish_id)},
+                    ]
+                })
+            if not menu:
+                menu = db["menu_items"].find_one({"Description": item.get("name")})
+            if not menu:
+                continue
+            qty = int(item.get("quantity", 1) or 1)
+            price = float(item.get("price", item.get("unit_price", 0)) or 0)
+            menu_id = menu.get("menu_id") or menu.get("MenuItemId")
+            if db["order_items"].find_one({"order_id": order_id_value, "menu_id": menu_id}):
+                continue
+            db["order_items"].insert_one({
+                "order_id": order_id_value,
+                "orderItemId": "OI" + order_id_value[-6:],
+                "menu_id": menu_id,
+                "menu_name": item.get("name") or menu.get("menu_name") or menu.get("Description"),
+                "quantity": qty,
+                "unit_price": price,
+                "subtotal": qty * price,
+                "cost_price": menu.get("cost_price", 0),
+                "branch_id": branch_id,
+            })
 
     stock_updates=[]
 

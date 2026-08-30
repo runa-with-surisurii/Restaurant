@@ -28,6 +28,15 @@ export const Route = createFileRoute("/admin/menu-insights")({
   component: MenuInsightsPage,
 });
 
+type AssociationRule = {
+  antecedent: string[];
+  consequent: string[];
+  support: number;
+  confidence: number;
+  lift: number;
+  rule: string;
+};
+
 type InsightRow = {
   menuId: string;
   menu: string;
@@ -42,14 +51,38 @@ type InsightRow = {
   action: string;
   profit: number | null;
   image?: string;
+  shareOfQuantity?: number;
+  shareOfRevenue?: number;
 };
 type Group = { name: string; count: number; example: string | null };
 type InsightData = {
   branches: Array<{ id: string; name: string; city: string }>;
+  selectedBranch: string;
   hasProfit: boolean;
+  summary: {
+    totalRevenue: number;
+    totalQuantity: number;
+    estimatedProfit: number;
+    orders: number;
+  };
   groups: Group[];
   rows: InsightRow[];
   trending: InsightRow[];
+  associationRules: AssociationRule[];
+  categoryBreakdown: Array<{
+    category: string;
+    revenue: number;
+    quantity: number;
+    profit: number;
+    margin: number;
+  }>;
+  branchBreakdown: Array<{
+    branchId: string;
+    branchName: string;
+    revenue: number;
+    quantity: number;
+    profit: number;
+  }>;
 };
 
 const groupMeta = {
@@ -57,25 +90,19 @@ const groupMeta = {
     icon: Sparkles,
     color: "text-primary",
     panel: "bg-primary/10",
-    description: "Strongest overall sales",
+    description: "Highest contribution to sales and revenue",
   },
-  "Rising Stars": {
+  "Steady Performers": {
     icon: TrendingUp,
     color: "text-emerald-600",
     panel: "bg-emerald-500/10",
-    description: "Fastest recent growth",
-  },
-  "Popular but Low Margin": {
-    icon: DollarSign,
-    color: "text-amber-600",
-    panel: "bg-amber-500/10",
-    description: "Sales are strong; profit unavailable",
+    description: "Solid sales with moderate performance",
   },
   "Needs Attention": {
     icon: AlertTriangle,
     color: "text-destructive",
     panel: "bg-destructive/10",
-    description: "Weakest overall performance",
+    description: "Lower contribution and weaker lift",
   },
 };
 
@@ -89,9 +116,7 @@ const categoryColors: Record<string, string> = {
 
 function groupBadgeClass(group: string) {
   if (group === "Best Sellers") return "border-primary/30 bg-primary/10 text-primary";
-  if (group === "Rising Stars") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700";
-  if (group === "Popular but Low Margin")
-    return "border-amber-500/30 bg-amber-500/10 text-amber-700";
+  if (group === "Steady Performers") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700";
   return "border-destructive/30 bg-destructive/10 text-destructive";
 }
 
@@ -110,7 +135,7 @@ function MenuInsightsPage() {
       .then((response) =>
         response.ok ? response.json() : Promise.reject(new Error("Unable to load menu insights")),
       )
-      .then(setData)
+      .then((payload) => setData(payload as InsightData))
       .catch((reason) =>
         setError(reason instanceof Error ? reason.message : "Unable to load menu insights"),
       );
@@ -121,6 +146,19 @@ function MenuInsightsPage() {
     [data, selectedGroup],
   );
   const groups = data?.groups ?? [];
+  const topAssociationRules = useMemo(() => {
+    return [...(data?.associationRules ?? [])]
+      .sort((a, b) => b.lift - a.lift)
+      .slice(0, 5)
+      .map((rule, index) => ({
+        ...rule,
+        rank: index + 1,
+      }));
+  }, [data]);
+  const strongestRule = useMemo(() => {
+    return [...(data?.associationRules ?? [])].sort((a, b) => b.lift - a.lift)[0] ?? null;
+  }, [data]);
+  const branchLabel = mode === "branch" ? data?.branches.find((item) => item.id === branch)?.name ?? "Branch" : "All Branches";
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8">
@@ -128,7 +166,7 @@ function MenuInsightsPage() {
         <div>
           <h1 className="font-display text-4xl tracking-wide md:text-5xl">Menu Insights</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Analyze menu performance overall or by branch.
+            Data-mining insights from completed orders: menu performance and item associations.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -176,7 +214,34 @@ function MenuInsightsPage() {
 
       {data && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Total Revenue</CardDescription>
+                <CardTitle className="text-2xl">{formatCurrency(data.summary.totalRevenue)}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Quantity Sold</CardDescription>
+                <CardTitle className="text-2xl">{data.summary.totalQuantity.toLocaleString()}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Estimated Gross Profit</CardDescription>
+                <CardTitle className="text-2xl">{formatCurrency(data.summary.estimatedProfit)}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Completed Orders</CardDescription>
+                <CardTitle className="text-2xl">{data.summary.orders.toLocaleString()}</CardTitle>
+              </CardHeader>
+            </Card>
+          </section>
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {groups.map((group) => {
               const meta = groupMeta[group.name as keyof typeof groupMeta];
               const Icon = meta.icon;
@@ -221,87 +286,161 @@ function MenuInsightsPage() {
             })}
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="size-5 text-primary" /> Menu Performance Ranking
-              </CardTitle>
-              <CardDescription>
-                Higher scores mean stronger overall performance. The score is out of 100.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="mb-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
-                <span>
-                  <i className="mr-1.5 inline-block size-2 rounded-full bg-primary" />
-                  Overall score
-                </span>
-                <span>Based on sold, revenue, and orders</span>
-              </div>
-              {data.rows.slice(0, 10).map((row, index) => (
-                <div
-                  key={row.menuId}
-                  className="grid grid-cols-[24px_minmax(0,1fr)_minmax(100px,2fr)_48px] items-center gap-3 text-sm"
-                >
-                  <span className="text-xs font-semibold text-muted-foreground">{index + 1}</span>
-                  <span className="truncate font-medium">{row.menu}</span>
-                  <div className="h-3 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary"
-                      style={{ width: `${Math.max(row.score, 2)}%` }}
-                    />
-                  </div>
-                  <span className="text-right font-bold tabular-nums">{row.score}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
           <section className="space-y-4">
-            <div>
-              <h2 className="font-display text-3xl">Trending Menus</h2>
-              <p className="text-sm text-muted-foreground">
-                Strongest recent sales growth from available order dates.
-              </p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              {data.trending.slice(0, 6).map((row) => (
-                <Card key={row.menuId} className="overflow-hidden">
-                  {row.image ? <img src={row.image} alt="" className="h-24 w-full object-cover" /> : <div className={`flex h-24 items-center justify-center ${categoryColors[row.category.toLowerCase()] ?? "bg-primary/10 text-primary"}`}><span className="font-display text-3xl">{row.category.slice(0, 1).toUpperCase()}</span></div>}
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">{row.menu}</CardTitle>
-                    <CardDescription>
-                      {row.category} · {row.menuId}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex justify-between text-sm">
-                    <span>{row.sold} sold</span>
-                    <Badge
-                      className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
-                      variant="outline"
-                    >
-                      {row.growth === null
-                        ? "No trend data"
-                        : `${row.growth > 0 ? "+" : ""}${row.growth}% growth`}
-                    </Badge>
-                  </CardContent>
-                </Card>
-              ))}
-              {!data.trending.length && (
-                <p className="text-sm text-muted-foreground">No trend data.</p>
-              )}
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Menu Combination Insights</CardTitle>
+                <CardDescription>
+                  FP-Growth association rules on completed orders. Results show which items are commonly bought together, not future sales predictions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {topAssociationRules.length ? (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                      {topAssociationRules.map((rule) => {
+                        const isStrongest = rule.rank === 1;
+                        const combinationItems = rule.rule
+                          .split(" + ")
+                          .map((item) => item.trim())
+                          .filter(Boolean);
+
+                        return (
+                          <div
+                            key={`${rule.rule}-${rule.rank}`}
+                            className={[
+                              "rounded-xl border p-3 shadow-sm transition-all",
+                              isStrongest
+                                ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+                                : "border-border bg-background/80 hover:border-primary/40",
+                            ].join(" ")}
+                          >
+                            <div className="mb-3 flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                Rank #{rule.rank}
+                              </span>
+                              {isStrongest && (
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+                                  Strongest
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="space-y-2 text-sm">
+                              <div className="min-w-0">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">Combination</p>
+                                <div className="mt-1 flex min-w-0 flex-col gap-1">
+                                  {combinationItems.length ? (
+                                    combinationItems.map((item, index) => (
+                                      <span
+                                        key={`${item}-${index}`}
+                                        className="break-words text-sm font-medium leading-snug text-foreground"
+                                      >
+                                        {item}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="break-words text-sm font-medium leading-snug text-foreground">
+                                      {rule.rule}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="rounded-lg bg-muted/40 px-2 py-2">
+                                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Combo Strength</p>
+                                <p className="mt-1 text-lg font-bold text-primary">{rule.lift.toFixed(2)}×</p>
+                              </div>
+
+                              <div className="space-y-1 text-xs text-muted-foreground">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span>Order Frequency</span>
+                                  <span className="font-medium text-foreground">{rule.support.toFixed(2)}%</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span>Co-Order Rate</span>
+                                  <span className="font-medium text-foreground">{rule.confidence.toFixed(1)}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border">
+                      <table className="w-full min-w-[700px] text-sm">
+                        <thead className="bg-muted/40 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <tr>
+                            {['Combination / Rule', 'Order Frequency', 'Co-Order Rate', 'Combo Strength'].map((heading) => (
+                              <th key={heading} className="px-4 py-3">{heading}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.associationRules.map((rule, index) => (
+                            <tr key={`${rule.rule}-${index}`} className="border-t odd:bg-background even:bg-muted/20">
+                              <td className="px-4 py-3 font-medium">{rule.rule}</td>
+                              <td className="px-4 py-3">{rule.support.toFixed(2)}%</td>
+                              <td className="px-4 py-3">{rule.confidence.toFixed(1)}%</td>
+                              <td className="px-4 py-3">{rule.lift.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No strong item associations were found for the selected branch/period. This can happen when most orders contain only one menu item.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
           </section>
+
+          {mode === "overall" && data.branchBreakdown.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Branch comparison</CardTitle>
+                <CardDescription>Completed-order revenue, quantity, and estimated profit by branch.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto rounded-xl border">
+                  <table className="w-full min-w-[600px] text-sm">
+                    <thead className="bg-muted/40 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-3">Branch</th>
+                        <th className="px-4 py-3">Quantity</th>
+                        <th className="px-4 py-3">Revenue</th>
+                        <th className="px-4 py-3">Estimated Profit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.branchBreakdown.map((branchItem) => (
+                        <tr key={branchItem.branchId} className="border-t odd:bg-background even:bg-muted/20">
+                          <td className="px-4 py-3 font-medium">{branchItem.branchName}</td>
+                          <td className="px-4 py-3">{branchItem.quantity.toLocaleString()}</td>
+                          <td className="px-4 py-3">{formatCurrency(branchItem.revenue)}</td>
+                          <td className="px-4 py-3">{formatCurrency(branchItem.profit)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card ref={tableRef}>
             <CardHeader>
-              <CardTitle>Menu Performance</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="size-5 text-primary" /> Menu Performance
+              </CardTitle>
               <CardDescription>
                 {selectedGroup !== "all"
-                  ? `${rows.length} menus in ${selectedGroup}. The table below shows only these menus.`
-                  : data.hasProfit
-                  ? "Profit is calculated from available cost data."
-                  : "Profit unavailable: menu_items.csv has no cost column."}
+                  ? `${rows.length} menus in ${selectedGroup}.`
+                  : `${branchLabel} • completed orders only`}
               </CardDescription>
               {selectedGroup !== "all" && (
                 <Button variant="outline" size="sm" className="mt-3 w-fit" onClick={() => setSelectedGroup("all")}>
@@ -311,19 +450,19 @@ function MenuInsightsPage() {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto rounded-xl border">
-                <table className="w-full min-w-[900px] text-sm">
+                <table className="w-full min-w-[1000px] text-sm">
                   <thead className="bg-muted/40 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     <tr>
                       {[
+                        "Rank",
                         "Menu",
                         "Category",
-                        "Sold",
+                        "Quantity Sold",
                         "Revenue",
-                        "Profit",
+                        "Estimated Profit",
                         "Orders",
-                        "Trend",
                         "Group",
-                        "Suggested Action",
+                        "Action",
                       ].map((heading) => (
                         <th key={heading} className="px-4 py-3">
                           {heading}
@@ -332,19 +471,15 @@ function MenuInsightsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row) => (
+                    {rows.map((row, index) => (
                       <tr key={row.menuId} className="border-t odd:bg-background even:bg-muted/20 hover:bg-primary/5">
+                        <td className="px-4 py-3 font-semibold text-muted-foreground">#{index + 1}</td>
                         <td className="px-4 py-3 font-medium">{row.menu}</td>
                         <td className="px-4 py-3">{row.category}</td>
-                        <td className="px-4 py-3">{row.sold}</td>
+                        <td className="px-4 py-3">{row.sold.toLocaleString()}</td>
                         <td className="px-4 py-3">{formatCurrency(row.revenue)}</td>
-                        <td className="px-4 py-3">
-                          {row.profit === null ? "Unavailable" : formatCurrency(row.profit)}
-                        </td>
+                        <td className="px-4 py-3">{formatCurrency(row.profit ?? 0)}</td>
                         <td className="px-4 py-3">{row.orders}</td>
-                        <td className={`px-4 py-3 font-medium ${row.growth !== null && row.growth > 0 ? "text-emerald-700" : row.growth !== null && row.growth < 0 ? "text-destructive" : "text-muted-foreground"}`}>
-                          {row.trend}
-                        </td>
                         <td className="px-4 py-3">
                           <Badge className={groupBadgeClass(row.group)} variant="outline">{row.group}</Badge>
                         </td>
@@ -355,7 +490,7 @@ function MenuInsightsPage() {
                 </table>
               </div>
               {!rows.length && (
-                <p className="py-8 text-center text-sm text-muted-foreground">No sales data.</p>
+                <p className="py-8 text-center text-sm text-muted-foreground">No menu performance data for the selected filters.</p>
               )}
             </CardContent>
           </Card>
