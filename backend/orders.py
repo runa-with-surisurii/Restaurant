@@ -9,12 +9,11 @@ router = APIRouter()
 def convert_unit(value, from_unit, to_unit):
     if not from_unit or not to_unit:
         return value
-    from_unit = str(from_unit).lower().strip()
-    to_unit = str(to_unit).lower().strip()
-    if from_unit == to_unit:
+    a, b = str(from_unit).lower().strip(), str(to_unit).lower().strip()
+    if a == b:
         return value
     conversions = {("kg", "g"): 1000, ("g", "kg"): 0.001, ("l", "ml"): 1000, ("liter", "ml"): 1000, ("ml", "l"): 0.001, ("ml", "liter"): 0.001, ("mg", "g"): 0.001, ("g", "mg"): 1000, ("oz", "g"): 28.3495, ("g", "oz"): 0.035274}
-    return value * conversions.get((from_unit, to_unit), 1)
+    return value * conversions.get((a, b), 1)
 
 
 def menu_image(menu):
@@ -23,85 +22,70 @@ def menu_image(menu):
     return str(menu.get("Image") or menu.get("image") or menu.get("imageUrl") or menu.get("ImageURL") or "")
 
 
+def find_menu(menu_id=None, name=None):
+    conditions = []
+    if menu_id is not None:
+        conditions += [{"menu_id": menu_id}, {"MenuItemId": int(menu_id) if str(menu_id).isdigit() else -1}]
+    if name:
+        conditions += [{"menu_name": name}, {"MenuItemName": name}, {"Description": name}]
+    return db["menu_items"].find_one({"$or": conditions}) if conditions else None
+
+
 def enrich_orders(orders):
-    menu_by_id = {}
+    menus = {}
     for menu in db["menu_items"].find({}, {"_id": 0}):
         mid = menu.get("menu_id") or menu.get("MenuItemId")
         if mid is not None:
-            menu_by_id[str(mid)] = menu
-
-    order_ids = []
-    for order in orders:
-        oid = order.get("order_id") or order.get("orderId") or order.get("_id")
-        if oid is not None:
-            order_ids.append(str(oid))
-
+            menus[str(mid)] = menu
+    order_ids = [str(o.get("order_id") or o.get("orderId") or o.get("_id")) for o in orders]
     item_map = {}
     if order_ids:
         for item in db["order_items"].find({"order_id": {"$in": order_ids}}, {"_id": 0}):
             item_map.setdefault(str(item.get("order_id")), []).append(item)
-
     for order in orders:
         oid = str(order.get("order_id") or order.get("orderId") or order.get("_id") or "")
-        items = item_map.get(oid) or order.get("items") or []
+        raw_items = item_map.get(oid) or order.get("items") or []
         normalized = []
-        for item in items:
+        for item in raw_items:
             mid = item.get("menu_id") or item.get("menuItemId") or item.get("MenuItemId")
-            menu = menu_by_id.get(str(mid)) if mid is not None else None
+            menu = menus.get(str(mid)) if mid is not None else find_menu(name=item.get("name") or item.get("menu_name"))
             name = item.get("menu_name") or item.get("name") or item.get("Description")
             if not name and menu:
                 name = menu.get("menu_name") or menu.get("MenuItemName") or menu.get("Description")
-            qty = item.get("quantity") or item.get("Quantity") or 1
-            price = item.get("unit_price") or item.get("price") or item.get("Price") or 0
+            qty = int(item.get("quantity") or item.get("Quantity") or 1)
+            price = float(item.get("unit_price") or item.get("price") or item.get("Price") or 0)
             image = item.get("image") or item.get("Image") or menu_image(menu)
-            normalized.append({
-                "menu_id": mid,
-                "name": str(name or "Unknown menu item"),
-                "quantity": int(qty),
-                "unit_price": float(price or 0),
-                "subtotal": float(item.get("subtotal") or item.get("Total") or (int(qty) * float(price or 0))),
-                "image": image,
-            })
+            if not image and mid:
+                image = f"/menu/{mid}.jpg"
+            normalized.append({"menu_id": mid, "name": str(name or "Unknown menu item"), "quantity": qty, "unit_price": price, "subtotal": float(item.get("subtotal") or item.get("Total") or qty * price), "image": image})
         order["items"] = normalized
         order["_id"] = str(order.get("_id")) if order.get("_id") is not None else oid
-        if "branchId" not in order and order.get("branch_id") is not None:
-            order["branchId"] = order["branch_id"]
-        if "total" not in order and order.get("total_amount") is not None:
-            order["total"] = float(order["total_amount"])
-        if order.get("status"):
-            order["status"] = str(order["status"]).lower()
+        if "branchId" not in order and order.get("branch_id") is not None: order["branchId"] = order["branch_id"]
+        if "total" not in order and order.get("total_amount") is not None: order["total"] = float(order["total_amount"])
+        if order.get("status"): order["status"] = str(order["status"]).lower()
     return orders
 
 
 @router.post("/api/orders")
 def create_order(order: dict):
-    items, order_items, branch_id = [], [], order.get("branchId") or order.get("branch_id")
+    items, order_items = [], []
+    branch_id = order.get("branchId") or order.get("branch_id")
     total_amount = 0.0
     for raw in order.get("items", []):
         item = dict(raw)
-        menu = None
-        dish_id = item.get("dishId") or item.get("menu_id") or item.get("menuItemId")
-        if dish_id:
-            try:
-                menu = db["menu_items"].find_one({"$or": [{"menu_id": dish_id}, {"MenuItemId": int(dish_id) if str(dish_id).isdigit() else -1}, {"Description": str(dish_id)}]})
-            except Exception:
-                pass
-        if not menu and item.get("name"):
-            menu = db["menu_items"].find_one({"$or": [{"menu_name": item["name"]}, {"MenuItemName": item["name"]}, {"Description": item["name"]}]})
+        menu = find_menu(item.get("dishId") or item.get("menu_id") or item.get("menuItemId"), item.get("name"))
         if menu:
             item["recipeId"] = menu.get("RecipeId") or menu.get("recipe_id")
             item["menuItemId"] = menu.get("MenuItemId") or menu.get("menu_id")
             item["menu_id"] = menu.get("menu_id") or menu.get("MenuItemId")
-            item["image"] = menu_image(menu)
-            if not item.get("name"):
-                item["name"] = menu.get("menu_name") or menu.get("MenuItemName") or menu.get("Description")
+            item["image"] = menu_image(menu) or f"/menu/{item['menu_id']}.jpg"
+            if not item.get("name"): item["name"] = menu.get("menu_name") or menu.get("MenuItemName") or menu.get("Description")
         items.append(item)
-        quantity = int(item.get("quantity", 1) or 1)
-        unit_price = float(item.get("price", item.get("unit_price", 0)) or 0)
-        subtotal = quantity * unit_price
+        qty = int(item.get("quantity", 1) or 1)
+        price = float(item.get("price", item.get("unit_price", 0)) or 0)
+        subtotal = qty * price
         total_amount += subtotal
-        order_items.append({"menu_id": item.get("menu_id") or item.get("dishId") or item.get("menuItemId"), "menu_name": item.get("name"), "image": item.get("image", ""), "quantity": quantity, "unit_price": unit_price, "subtotal": subtotal, "cost_price": item.get("costPrice", 0)})
-
+        order_items.append({"menu_id": item.get("menu_id") or item.get("dishId") or item.get("menuItemId"), "menu_name": item.get("name"), "image": item.get("image", ""), "quantity": qty, "unit_price": price, "subtotal": subtotal, "cost_price": item.get("costPrice", 0)})
     order_data = {"branchId": branch_id, "branch_id": branch_id, "createdBy": order.get("createdBy", "customer"), "items": items, "total": total_amount, "status": "pending", "createdAt": datetime.now()}
     result = db["orders"].insert_one(order_data)
     order_id = str(result.inserted_id)
@@ -118,85 +102,76 @@ def get_all_orders():
 
 @router.get("/api/orders/{branch_id}")
 def get_orders(branch_id: str):
-    orders = list(db["orders"].find({"$or": [{"branchId": branch_id}, {"branch_id": branch_id}]}).sort("createdAt", -1))
-    return enrich_orders(orders)
+    return enrich_orders(list(db["orders"].find({"$or": [{"branchId": branch_id}, {"branch_id": branch_id}]}).sort("createdAt", -1)))
 
 
 @router.put("/api/orders/{order_id}/confirm")
 def confirm_order(order_id: str):
-    try:
-        order = db["orders"].find_one({"_id": ObjectId(order_id)})
-    except Exception:
-        return {"success": False, "message": "Invalid order id"}
-    if not order:
-        return {"success": False, "message": "Order not found"}
-    if str(order.get("status", "")).lower() == "confirmed":
-        return {"success": False, "message": "Already confirmed"}
+    try: order = db["orders"].find_one({"_id": ObjectId(order_id)})
+    except Exception: return {"success": False, "message": "Invalid order id"}
+    if not order: return {"success": False, "message": "Order not found"}
+    if str(order.get("status", "")).lower() in {"confirmed", "completed"}: return {"success": False, "message": "Already confirmed"}
 
     branch_id = order.get("branchId") or order.get("branch_id")
-    if not order.get("order_id"):
-        order["order_id"] = str(order["_id"])
-        db["orders"].update_one({"_id": order["_id"]}, {"$set": {"order_id": order["order_id"]}})
-    order_id_value = str(order["order_id"])
+    order_id_value = str(order.get("order_id") or order["_id"])
+    if not order.get("order_id"): db["orders"].update_one({"_id": order["_id"]}, {"$set": {"order_id": order_id_value}})
 
-    existing_order_items = list(db["order_items"].find({"order_id": order_id_value}, {"_id": 0}))
-    if not existing_order_items:
+    existing = list(db["order_items"].find({"order_id": order_id_value}, {"_id": 0}))
+    if not existing:
         for item in order.get("items", []):
-            menu = None
-            dish_id = item.get("dishId") or item.get("menu_id") or item.get("menuItemId")
-            if dish_id:
-                try:
-                    menu = db["menu_items"].find_one({"$or": [{"menu_id": dish_id}, {"MenuItemId": int(dish_id) if str(dish_id).isdigit() else -1}, {"Description": str(dish_id)}]})
-                except Exception:
-                    pass
-            if not menu and item.get("name"):
-                menu = db["menu_items"].find_one({"$or": [{"menu_name": item["name"]}, {"MenuItemName": item["name"]}, {"Description": item["name"]}]})
+            menu = find_menu(item.get("dishId") or item.get("menu_id") or item.get("menuItemId"), item.get("name"))
             if menu:
-                menu_id = menu.get("menu_id") or menu.get("MenuItemId")
+                mid = menu.get("menu_id") or menu.get("MenuItemId")
                 qty = int(item.get("quantity", 1) or 1)
                 price = float(item.get("price", item.get("unit_price", 0)) or 0)
-                db["order_items"].insert_one({"order_id": order_id_value, "orderItemId": "OI" + order_id_value[-6:], "menu_id": menu_id, "menu_name": item.get("name") or menu.get("menu_name") or menu.get("MenuItemName") or menu.get("Description"), "image": menu_image(menu), "quantity": qty, "unit_price": price, "subtotal": qty * price, "cost_price": menu.get("cost_price", 0), "branch_id": branch_id})
+                db["order_items"].insert_one({"order_id": order_id_value, "orderItemId": "OI" + order_id_value[-6:], "menu_id": mid, "menu_name": item.get("name") or menu.get("menu_name") or menu.get("MenuItemName") or menu.get("Description"), "image": menu_image(menu) or f"/menu/{mid}.jpg", "quantity": qty, "unit_price": price, "subtotal": qty * price, "cost_price": menu.get("cost_price", 0), "branch_id": branch_id})
 
+    # Dataset uses menu_ingredients(menu_id, ingredient_id, quantity_required),
+    # while branch_inventory uses branch_id/ingredient_id/stock_quantity.
     stock_updates = []
-    for item in order.get("items", []):
-        recipe_id = item.get("recipeId")
-        if not recipe_id:
-            dish_id = item.get("dishId") or item.get("menu_id") or item.get("menuItemId")
-            menu = None
-            if dish_id:
-                try:
-                    menu = db["menu_items"].find_one({"$or": [{"menu_id": dish_id}, {"MenuItemId": int(dish_id) if str(dish_id).isdigit() else -1}]})
-                except Exception:
-                    pass
-            if not menu and item.get("name"):
-                menu = db["menu_items"].find_one({"$or": [{"menu_name": item["name"]}, {"MenuItemName": item["name"]}, {"Description": item["name"]}]})
-            if menu:
-                recipe_id = menu.get("RecipeId") or menu.get("recipe_id")
-        if not recipe_id:
-            continue
-        recipes = list(db["recipe_ingredient_assignments"].find({"$or": [{"RecipeId": recipe_id}, {"RecipeId": str(recipe_id)}, {"RecipeId": int(recipe_id) if str(recipe_id).isdigit() else -999999}]}))
-        quantity_ordered = int(item.get("quantity", 1) or 1)
+    items_for_stock = order.get("items", [])
+    if not items_for_stock:
+        items_for_stock = existing
+    for item in items_for_stock:
+        menu_id = item.get("menu_id") or item.get("dishId") or item.get("menuItemId")
+        menu = find_menu(menu_id, item.get("name") or item.get("menu_name"))
+        if menu: menu_id = menu.get("menu_id") or menu.get("MenuItemId")
+        if not menu_id: continue
+        qty_ordered = int(item.get("quantity") or item.get("qty") or 1)
+        recipes = list(db["menu_ingredients"].find({"$or": [{"menu_id": menu_id}, {"menu_id": str(menu_id)}]}, {"_id": 0}))
+        if not recipes:
+            recipe_id = menu.get("RecipeId") if menu else None
+            if recipe_id:
+                recipes = list(db["recipe_ingredient_assignments"].find({"$or": [{"RecipeId": recipe_id}, {"RecipeId": str(recipe_id)}]}, {"_id": 0}))
         for recipe in recipes:
-            ingredient_id = recipe.get("IngredientId") or recipe.get("ingredient_id")
-            recipe_qty = float(recipe.get("Quantity", recipe.get("quantity", 0)) or 0)
-            recipe_unit = recipe.get("Unit", recipe.get("unit", ""))
-            inventory = db["branch_inventory"].find_one({"$and": [{"$or": [{"branchId": branch_id}, {"branchId": str(branch_id)}, {"branch_id": branch_id}]}, {"$or": [{"IngredientId": ingredient_id}, {"IngredientId": str(ingredient_id)}, {"ingredient_id": ingredient_id}]}]})
-            if not inventory:
-                continue
-            stock_unit = inventory.get("Unit", inventory.get("unit", ""))
-            used = convert_unit(recipe_qty, recipe_unit, stock_unit) * quantity_ordered
-            before = float(inventory.get("Stock", inventory.get("stock_quantity", 0)) or 0)
-            if used <= 0 or before < used:
-                continue
-            remaining = before - used
-            db["branch_inventory"].update_one({"_id": inventory["_id"]}, {"$set": {"Stock": remaining}})
-            db["inventory_transactions"].insert_one({"orderId": order_id_value, "branchId": branch_id, "IngredientId": ingredient_id, "IngredientName": inventory.get("IngredientName", inventory.get("ingredient_name", "Unknown")), "beforeStock": before, "used": used, "unit": stock_unit, "remaining": remaining, "createdAt": datetime.now()})
-            stock_updates.append({"IngredientName": inventory.get("IngredientName", inventory.get("ingredient_name", "Unknown")), "Used": used, "Unit": stock_unit, "Remaining": remaining})
+            ingredient_id = recipe.get("ingredient_id") or recipe.get("IngredientId")
+            required = float(recipe.get("quantity_required", recipe.get("Quantity", 0)) or 0) * qty_ordered
+            if ingredient_id is None or required <= 0: continue
+            inv = db["branch_inventory"].find_one({"$or": [
+                {"branch_id": branch_id, "ingredient_id": ingredient_id},
+                {"branch_id": str(branch_id), "ingredient_id": str(ingredient_id)},
+                {"branchId": branch_id, "IngredientId": ingredient_id},
+                {"branchId": str(branch_id), "IngredientId": str(ingredient_id)},
+            ]})
+            if not inv: continue
+            stock = float(inv.get("stock_quantity", inv.get("Stock", 0)) or 0)
+            stock_unit = inv.get("unit", inv.get("Unit", ""))
+            ingredient = db["ingredients"].find_one({"$or": [{"ingredient_id": ingredient_id}, {"ingredient_id": str(ingredient_id)}, {"IngredientId": ingredient_id}, {"IngredientId": str(ingredient_id)}]}, {"_id": 0})
+            recipe_unit = recipe.get("unit") or recipe.get("Unit") or (ingredient or {}).get("unit") or stock_unit
+            used = convert_unit(required, recipe_unit, stock_unit)
+            if stock < used: continue
+            remaining = stock - used
+            if "stock_quantity" in inv:
+                db["branch_inventory"].update_one({"_id": inv["_id"]}, {"$set": {"stock_quantity": remaining}})
+            else:
+                db["branch_inventory"].update_one({"_id": inv["_id"]}, {"$set": {"Stock": remaining}})
+            ingredient_name = inv.get("ingredient_name") or inv.get("IngredientName") or (ingredient or {}).get("ingredient_name") or (ingredient or {}).get("IngredientName") or str(ingredient_id)
+            db["inventory_transactions"].insert_one({"orderId": order_id_value, "branchId": branch_id, "IngredientId": ingredient_id, "IngredientName": ingredient_name, "beforeStock": stock, "used": used, "unit": stock_unit, "remaining": remaining, "createdAt": datetime.now()})
+            stock_updates.append({"IngredientName": ingredient_name, "Used": used, "Unit": stock_unit, "Remaining": remaining})
 
     for item in order.get("items", []):
-        qty = int(item.get("quantity", 1) or 1)
-        price = float(item.get("price", item.get("unit_price", 0)) or 0)
-        db["order_details"].insert_one({"StoreNumber": branch_id, "OrderId": order_id_value, "Description": item.get("name", "Unknown"), "Quantity": qty, "Price": price, "Total": qty * price, "date": datetime.now().strftime("%Y-%m-%d")})
+        qty = int(item.get("quantity", 1) or 1); price = float(item.get("price", item.get("unit_price", 0)) or 0)
+        db["order_details"].update_one({"OrderId": order_id_value, "Description": item.get("name", "Unknown")}, {"$set": {"StoreNumber": branch_id, "Quantity": qty, "Price": price, "Total": qty * price, "date": datetime.now().strftime("%Y-%m-%d")}}, upsert=True)
 
     db["orders"].update_one({"_id": ObjectId(order_id)}, {"$set": {"status": "confirmed", "confirmedAt": datetime.now()}})
     return {"success": True, "message": "Order confirmed successfully", "stockUpdated": stock_updates}
