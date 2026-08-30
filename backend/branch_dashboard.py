@@ -53,13 +53,24 @@ def get_inventory_usage(branch_id, limit=10):
     return result
 
 
+def recent_menus_sold(orders, limit=2):
+    sorted_orders = sorted(orders, key=lambda o: order_date(o) or datetime.min, reverse=True)
+    result = []
+    seen = set()
+    for order in sorted_orders:
+        for item in order.get("items", []):
+            menu_id = item.get("menu_id") or item.get("menuItemId") or item.get("dishId")
+            key = str(menu_id or item.get("name") or "unknown")
+            if key in seen: continue
+            seen.add(key)
+            result.append({"menuId": menu_id, "name": item.get("name", "Unknown"), "quantity": int(item.get("quantity", item.get("qty", 1)) or 1), "image": item.get("image") or "/menu/default.png"})
+            if len(result) >= limit: return result
+    return result
+
+
 def latest_menu_sold(orders):
-    if not orders: return None
-    orders.sort(key=lambda o: order_date(o) or datetime.min, reverse=True)
-    items = orders[0].get("items", [])
-    if not items: return None
-    item = items[0]
-    return {"name": item.get("name", "Unknown"), "quantity": int(item.get("quantity", item.get("qty", 1)) or 1), "image": item.get("image") or "/menu/default.png"}
+    menus = recent_menus_sold(orders, 1)
+    return menus[0] if menus else None
 
 
 def calculate_growth(branch_id):
@@ -111,8 +122,8 @@ def branch_dashboard(branch_id: str):
         dt = order_date(order)
         if dt and dt >= week_start: sales_map[dt.strftime("%a")] += order_financials(order)[2]
     weekly_sales = [{"day": d, "sales": round(sales_map[d], 2)} for d in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]]
-    usage = get_inventory_usage(branch_id, 10); prediction = sales_prediction(branch_id)
-    return {"orders": len(today_orders), "totalOrders": len(all_orders), "revenue": round(today_revenue, 2), "totalRevenue": round(total_revenue, 2), "customers": len(today_orders), "itemsSold": items_sold, "growth": calculate_growth(branch_id), "weekly_sales": weekly_sales, "inventory_usage": usage, "inventoryUsage": usage, "current_menu_sold": latest_menu_sold(all_orders), "currentMenuSold": latest_menu_sold(all_orders), "sales_prediction": prediction, "salesPrediction": prediction}
+    usage = get_inventory_usage(branch_id, 10); prediction = sales_prediction(branch_id); recent_menus = recent_menus_sold(all_orders, 2)
+    return {"orders": len(today_orders), "totalOrders": len(all_orders), "revenue": round(today_revenue, 2), "totalRevenue": round(total_revenue, 2), "customers": len(today_orders), "itemsSold": items_sold, "growth": calculate_growth(branch_id), "weekly_sales": weekly_sales, "inventory_usage": usage, "inventoryUsage": usage, "recent_menus": recent_menus, "recentMenus": recent_menus, "current_menu_sold": recent_menus[0] if recent_menus else None, "currentMenuSold": recent_menus[0] if recent_menus else None, "sales_prediction": prediction, "salesPrediction": prediction}
 
 
 @router.get("/api/branch/dashboard/{branch_id}/sales-prediction")
