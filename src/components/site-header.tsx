@@ -7,10 +7,7 @@ import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const customerNav = [
-  { to: "/", label: "Home" },
-  { to: "/menu", label: "Menu" },
-  { to: "/cart", label: "Cart" },
-  { to: "/orders", label: "Orders" },
+  { to: "/", label: "Home" }, { to: "/menu", label: "Menu" }, { to: "/cart", label: "Cart" }, { to: "/orders", label: "Orders" },
 ] as const;
 
 export function SiteHeader() {
@@ -29,23 +26,9 @@ export function SiteHeader() {
         </Link>
         {!adminUser && <nav className="hidden gap-2 md:flex">{customerNav.map((item) => <Link key={item.to} to={item.to} className={cn("rounded-md px-3 py-2 text-sm", pathname === item.to ? "text-primary" : "text-muted-foreground")}>{item.label}</Link>)}</nav>}
         <div className="flex items-center gap-2">
-          {!adminUser && <>
-            <Button asChild variant="ghost" size="icon"><Link to="/favorites"><Heart /></Link></Button>
-            <Button asChild variant="ghost" size="icon" className="relative"><Link to="/cart"><ShoppingBag />{cartCount > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-primary px-1 text-xs">{cartCount}</span>}</Link></Button>
-          </>}
-          {adminUser && <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><Shield /></Button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{adminUser.name}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => navigate({ to: staffHome })}><Shield /> Console</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive" onSelect={() => { logoutAll(); navigate({ to: "/login" }); }}><LogOut /> Logout</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>}
-          {user && !adminUser && <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><User /></Button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end"><DropdownMenuLabel>{user.name}</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive" onSelect={() => { logoutAll(); navigate({ to: "/login" }); }}><LogOut /> Logout</DropdownMenuItem></DropdownMenuContent>
-          </DropdownMenu>}
+          {!adminUser && <><Button asChild variant="ghost" size="icon"><Link to="/favorites"><Heart /></Link></Button><Button asChild variant="ghost" size="icon" className="relative"><Link to="/cart"><ShoppingBag />{cartCount > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-primary px-1 text-xs">{cartCount}</span>}</Link></Button></>}
+          {adminUser && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><Shield /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuLabel>{adminUser.name}</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => navigate({ to: staffHome })}><Shield /> Console</DropdownMenuItem><DropdownMenuItem className="text-destructive" onSelect={() => { logoutAll(); navigate({ to: "/login" }); }}><LogOut /> Logout</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}
+          {user && !adminUser && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><User /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuLabel>{user.name}</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive" onSelect={() => { logoutAll(); navigate({ to: "/login" }); }}><LogOut /> Logout</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}
           {!user && !adminUser && <Button asChild className="rounded-full"><Link to="/login">Sign in</Link></Button>}
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen((value) => !value)}>{open ? <X /> : <MenuIcon />}</Button>
         </div>
