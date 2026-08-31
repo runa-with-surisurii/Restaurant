@@ -22,7 +22,7 @@ export function SiteHeader() {
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 md:px-6">
         <Link to="/" className="flex items-center gap-2">
           <span className="grid size-9 place-items-center rounded-lg bg-gradient-ember"><Flame className="size-5 text-white" /></span>
-          <span className="font-display text-2xl">Taste &amp; Treasure</span>
+          <span className="font-display text-2xl">Ember &amp; Oak</span>
         </Link>
         {!adminUser && <nav className="hidden gap-2 md:flex">{customerNav.map((item) => <Link key={item.to} to={item.to} className={cn("rounded-md px-3 py-2 text-sm", pathname === item.to ? "text-primary" : "text-muted-foreground")}>{item.label}</Link>)}</nav>}
         <div className="flex items-center gap-2">
