@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from collections import defaultdict
 from datetime import datetime, timedelta
 import math
+import pandas as pd
+from mlxtend.frequent_patterns import association_rules as mlxtend_association_rules, fpgrowth
 from orders import router as order_router
 from branch_dashboard import router as branch_dashboard_router
 from branch_inventory import router as branch_inventory_router
@@ -394,97 +396,331 @@ def startup_event():
 # ============================================================
 
 @app.get("/api/menu-insights")
-def menu_insights(branch_id: str = "all"):
-    menu_items = list(db["menu_items"].find({}, {"_id": 0}))
+def menu_insights(
+    branch_id: str = "all",
+    min_support: float = 0.0005,
+    min_confidence: float = 0.04,
+    min_lift: float = 1.0,
+    max_rules: int = 10,
+):
     branches = list(db["branches"].find({}, {"_id": 0}))
+    menu_items = list(db["menu_items"].find({}, {"_id": 0}))
     orders = list(db["orders"].find({}, {"_id": 0}))
     order_items = list(db["order_items"].find({}, {"_id": 0}))
 
-    valid_statuses = {"completed", "complete", "paid", "placed", "preparing", "ready"}
-    selected_orders = {
-        str(order.get("order_id")): order
-        for order in orders
-        if str(order.get("status", "completed")).strip().lower() not in {"cancelled", "canceled", "invalid"}
-        and (branch_id == "all" or str(order.get("branch_id")) == branch_id)
-    }
-    rows = {
-        str(item.get("menu_id")): {
-            "menuId": str(item.get("menu_id")),
-            "menu": item.get("menu_name", "Unknown menu"),
-            "category": item.get("category", "Unknown"),
-            "image": item.get("image", ""),
-            "sold": 0,
+    def to_float(value, default=0.0):
+        try:
+            return float(value) if value is not None else default
+        except (TypeError, ValueError):
+            return default
+
+    def normalize_status(value):
+        return str(value or "").strip().lower()
+
+    selected_orders = {}
+    for order in orders:
+        order_status = normalize_status(order.get("status"))
+        if order_status not in {"completed", "complete", "paid", "confirmed"}:
+            continue
+
+        order_branch = order.get("branch_id")
+        if order_branch is None:
+            order_branch = order.get("branchId")
+
+        if branch_id != "all" and str(order_branch) != str(branch_id):
+            continue
+
+        order_key = str(order.get("order_id") or order.get("_id") or "")
+        if order_key:
+            selected_orders[order_key] = order
+
+    menu_lookup = {}
+    for item in menu_items:
+        menu_id = str(item.get("menu_id"))
+        if branch_id == "all" or str(item.get("branch_id")) == branch_id:
+            menu_lookup[menu_id] = {
+                "menuId": menu_id,
+                "menu": str(item.get("menu_name") or "Unknown menu").strip(),
+                "category": str(item.get("category") or "Other").strip() or "Other",
+                "cost_price": to_float(item.get("cost_price"), 0.0),
+                "branch_id": str(item.get("branch_id")),
+                "image": str(item.get("image") or f"/menu/{menu_id}.jpg"),
+            }
+
+    menu_stats = {
+        menu_id: {
+            "menuId": meta["menuId"],
+            "menu": meta["menu"],
+            "category": meta["category"],
+            "image": meta["image"],
+            "sold": 0.0,
             "revenue": 0.0,
-            "orders": 0,
-            "recent": 0,
-            "previous": 0,
+            "estimated_cost": 0.0,
+            "orders": set(),
+            "recent": 0.0,
+            "previous": 0.0,
+            "growth": None,
+            "group": "Steady Performers",
+            "trend": "No trend data",
+            "action": "Monitor",
+            "score": 0.0,
+            "profit": 0.0,
+            "profitMargin": 0.0,
         }
-        for item in menu_items
+        for menu_id, meta in menu_lookup.items()
     }
-    dates = [
-        datetime.fromisoformat(str(order.get("order_date")))
-        for order in selected_orders.values()
-        if order.get("order_date")
-    ]
-    latest = max(dates) if dates else datetime.now()
+
+    basket_by_order = defaultdict(set)
+    order_dates = []
+    for order_id, order in selected_orders.items():
+        order_date = order.get("order_date")
+        if order_date:
+            try:
+                order_dates.append(datetime.fromisoformat(str(order_date)))
+            except ValueError:
+                pass
+
+    latest = max(order_dates) if order_dates else datetime.now()
     split = latest - timedelta(days=30)
     previous_split = latest - timedelta(days=60)
-    for item in order_items:
-        order = selected_orders.get(str(item.get("order_id")))
-        menu_id = str(item.get("menu_id"))
-        if not order or menu_id not in rows:
+
+    for order_item in order_items:
+        order_id = str(order_item.get("order_id"))
+        order = selected_orders.get(order_id)
+        if not order:
             continue
-        quantity = float(item.get("quantity") or 0)
-        revenue = float(item.get("subtotal") or quantity * float(item.get("unit_price") or 0))
-        row = rows[menu_id]
-        row["sold"] += quantity
-        row["revenue"] += revenue
-        row["orders"] += 1
-        order_date = datetime.fromisoformat(str(order.get("order_date")))
+
+        menu_id = str(order_item.get("menu_id"))
+        menu_meta = menu_lookup.get(menu_id)
+        if not menu_meta:
+            continue
+
+        quantity = to_float(order_item.get("quantity"), 0.0)
+        subtotal = to_float(order_item.get("subtotal"), quantity * to_float(order_item.get("unit_price"), 0.0))
+        cost_price = menu_meta["cost_price"]
+        menu_stat = menu_stats[menu_id]
+
+        menu_stat["sold"] += quantity
+        menu_stat["revenue"] += subtotal
+        menu_stat["estimated_cost"] += quantity * cost_price
+        menu_stat["orders"].add(order_id)
+        basket_by_order[order_id].add(menu_meta["menu"])
+
+        try:
+            order_date = datetime.fromisoformat(str(order.get("order_date")))
+        except (TypeError, ValueError):
+            continue
+
         if order_date >= split:
-            row["recent"] += quantity
+            menu_stat["recent"] += quantity
         elif order_date >= previous_split:
-            row["previous"] += quantity
+            menu_stat["previous"] += quantity
 
-    active_rows = list(rows.values())
-    max_values = [max((row[key] for row in active_rows), default=1) or 1 for key in ("sold", "revenue", "orders")]
-    for row in active_rows:
-        row["growth"] = None if row["previous"] == 0 and row["recent"] == 0 else round(((row["recent"] - row["previous"]) / row["previous"] * 100), 1) if row["previous"] else None
-        row["score"] = round((row["sold"] / max_values[0] * 45) + (row["revenue"] / max_values[1] * 35) + (row["orders"] / max_values[2] * 20), 1)
+    total_quantity = sum(row["sold"] for row in menu_stats.values())
+    total_revenue = sum(row["revenue"] for row in menu_stats.values())
+    total_profit = sum(row["revenue"] - row["estimated_cost"] for row in menu_stats.values())
 
-    # Small, deterministic K-Means over supported performance features.
-    features = [[row["sold"] / max_values[0], row["revenue"] / max_values[1], row["orders"] / max_values[2], (row["growth"] or 0) / 100] for row in active_rows]
-    k = min(4, len(features))
-    centroids = [features[index][:] for index in [0, len(features) // 3, (len(features) * 2) // 3, len(features) - 1][:k]] if features else []
-    for _ in range(12):
-        groups = [[] for _ in range(k)]
-        for feature in features:
-            index = min(range(k), key=lambda center: sum((feature[i] - centroids[center][i]) ** 2 for i in range(4)))
-            groups[index].append(feature)
-        for index, group in enumerate(groups):
-            if group:
-                centroids[index] = [sum(feature[i] for feature in group) / len(group) for i in range(4)]
+    rows = []
+    for menu_id, stat in menu_stats.items():
+        revenue = stat["revenue"]
+        quantity = stat["sold"]
+        profit = revenue - stat["estimated_cost"]
+        stat["profit"] = profit
+        stat["profitMargin"] = (profit / revenue * 100) if revenue else 0.0
+        if stat["previous"] > 0:
+            stat["growth"] = ((stat["recent"] - stat["previous"]) / stat["previous"]) * 100
+        else:
+            stat["growth"] = None
 
-    ranked_centers = sorted(range(k), key=lambda index: sum(centroids[index][:3]), reverse=True)
-    label_by_cluster = {index: "Needs Attention" for index in range(k)}
-    if ranked_centers:
-        label_by_cluster[ranked_centers[0]] = "Best Sellers"
-    if len(ranked_centers) > 1:
-        label_by_cluster[max(ranked_centers[1:], key=lambda index: centroids[index][3])] = "Rising Stars"
-    for row, feature in zip(active_rows, features):
-        cluster = min(range(k), key=lambda center: sum((feature[i] - centroids[center][i]) ** 2 for i in range(4))) if k else 0
-        row["group"] = label_by_cluster.get(cluster, "Needs Attention")
-        row["profit"] = None
-        row["trend"] = "No trend data" if row["growth"] is None else f"{row['growth']:+.1f}%"
-        row["action"] = {"Best Sellers": "Keep & Promote", "Rising Stars": "Promote", "Needs Attention": "Review / Consider Dropping"}.get(row["group"], "Review")
-    active_rows.sort(key=lambda row: row["score"], reverse=True)
-    group_names = ["Best Sellers", "Rising Stars", "Popular but Low Margin", "Needs Attention"]
+        share_of_quantity = (quantity / total_quantity * 100) if total_quantity else 0.0
+        share_of_revenue = (revenue / total_revenue * 100) if total_revenue else 0.0
+        score = (share_of_quantity * 0.55) + (share_of_revenue * 0.45)
+        stat["score"] = score
+
+        rows.append({
+            "menuId": menu_id,
+            "menu": stat["menu"],
+            "category": stat["category"],
+            "image": stat["image"],
+            "sold": quantity,
+            "revenue": revenue,
+            "orders": len(stat["orders"]),
+            "recent": stat["recent"],
+            "previous": stat["previous"],
+            "growth": stat["growth"],
+            "score": score,
+            "profit": profit,
+            "profitMargin": stat["profitMargin"],
+            "shareOfQuantity": share_of_quantity,
+            "shareOfRevenue": share_of_revenue,
+            "group": "Steady Performers",
+            "trend": "No trend data",
+            "action": "Monitor",
+        })
+
+    if rows:
+        ranked = sorted(rows, key=lambda row: (row["revenue"], row["sold"]), reverse=True)
+        cutoff = max(1, int(math.ceil(len(ranked) * 0.35)))
+        best_ids = {row["menuId"] for row in ranked[:cutoff]}
+        attention_ids = {row["menuId"] for row in ranked[-cutoff:]}
+
+        for row in rows:
+            if row["menuId"] in best_ids:
+                row["group"] = "Best Sellers"
+                row["action"] = "Keep & Promote"
+            elif row["menuId"] in attention_ids:
+                row["group"] = "Needs Attention"
+                row["action"] = "Review / Improve"
+            else:
+                row["group"] = "Steady Performers"
+                row["action"] = "Monitor"
+
+            if row["growth"] is not None:
+                row["trend"] = f"{row['growth']:+.1f}% Sales Growth"
+            else:
+                row["trend"] = f"{row['shareOfQuantity']:.1f}% of quantity sold"
+
+    rows.sort(key=lambda row: row["score"], reverse=True)
+    group_names = ["Best Sellers", "Steady Performers", "Needs Attention"]
     groups_response = []
     for name in group_names:
-        members = [row for row in active_rows if row.get("group") == name]
-        groups_response.append({"name": name, "count": len(members), "example": members[0]["menu"] if members else None})
-    trending = sorted([row for row in active_rows if row["growth"] is not None], key=lambda row: row["growth"], reverse=True)[:6]
-    return {"branches": [{"id": b.get("branch_id"), "name": b.get("branch_name"), "city": b.get("city", "")} for b in branches], "hasProfit": False, "groups": groups_response, "rows": active_rows, "trending": trending}
+        members = [row for row in rows if row["group"] == name]
+        groups_response.append({
+            "name": name,
+            "count": len(members),
+            "example": members[0]["menu"] if members else None,
+        })
+
+    trending = [
+        row for row in sorted(rows, key=lambda row: (row["growth"] is not None, row["growth"] or 0), reverse=True)
+        if row["growth"] is not None
+    ][:6]
+
+    total_transactions = len(selected_orders)
+    if total_transactions <= 0:
+        association_rules = []
+    else:
+        transactions = [tuple(sorted(basket)) for basket in basket_by_order.values() if len(basket) > 1]
+        if not transactions:
+            association_rules = []
+        else:
+            all_items = sorted({item for transaction in transactions for item in transaction})
+            frame = pd.DataFrame(
+                [
+                    {item: bool(item in transaction) for item in all_items}
+                    for transaction in transactions
+                ],
+                dtype=bool,
+            )
+
+            frequent_itemsets = fpgrowth(frame, min_support=min_support, use_colnames=True)
+            if frequent_itemsets.empty:
+                association_rules = []
+            else:
+                rule_frame = mlxtend_association_rules(
+                    frequent_itemsets,
+                    metric="lift",
+                    min_threshold=min_lift,
+                )
+                rule_frame = rule_frame[
+                    (rule_frame["support"] >= min_support)
+                    & (rule_frame["confidence"] >= min_confidence)
+                    & (rule_frame["lift"] >= min_lift)
+                ]
+                rule_frame = rule_frame.sort_values(
+                    ["lift", "confidence", "support"],
+                    ascending=False,
+                ).head(max_rules)
+
+                association_rules = []
+                seen_itemsets = set()
+                for _, row in rule_frame.iterrows():
+                    itemset = tuple(sorted(set(list(row["antecedents"]) + list(row["consequents"]))))
+                    if itemset in seen_itemsets:
+                        continue
+                    seen_itemsets.add(itemset)
+
+                    rule_text = " + ".join(itemset)
+                    association_rules.append({
+                        "antecedent": list(itemset),
+                        "consequent": [],
+                        "support": round(float(row["support"]) * 100, 3),
+                        "confidence": round(float(row["confidence"]) * 100, 3),
+                        "lift": round(float(row["lift"]), 3),
+                        "rule": rule_text,
+                    })
+
+    category_breakdown = []
+    category_totals = defaultdict(lambda: {"revenue": 0.0, "quantity": 0.0, "profit": 0.0})
+    for row in rows:
+        bucket = category_totals[row["category"]]
+        bucket["revenue"] += row["revenue"]
+        bucket["quantity"] += row["sold"]
+        bucket["profit"] += row["profit"]
+
+    for category, totals in sorted(category_totals.items()):
+        category_breakdown.append({
+            "category": category,
+            "revenue": totals["revenue"],
+            "quantity": totals["quantity"],
+            "profit": totals["profit"],
+            "margin": (totals["profit"] / totals["revenue"] * 100) if totals["revenue"] else 0.0,
+        })
+
+    category_breakdown.sort(key=lambda item: item["revenue"], reverse=True)
+
+    branch_summary = []
+    if branch_id == "all":
+        branch_map = defaultdict(lambda: {"revenue": 0.0, "quantity": 0.0, "profit": 0.0, "orders": 0})
+        for order in selected_orders.values():
+            branch_id_value = str(order.get("branch_id") or order.get("branchId") or "")
+            branch_map[branch_id_value]["orders"] += 1
+        for order_item in order_items:
+            order = selected_orders.get(str(order_item.get("order_id")))
+            if not order:
+                continue
+            menu_id = str(order_item.get("menu_id"))
+            menu_meta = menu_lookup.get(menu_id)
+            if not menu_meta:
+                continue
+            branch_value = str(order.get("branch_id") or order.get("branchId") or "")
+            qty = to_float(order_item.get("quantity"), 0.0)
+            subtotal = to_float(order_item.get("subtotal"), qty * to_float(order_item.get("unit_price"), 0.0))
+            cost = qty * to_float(menu_meta.get("cost_price"), 0.0)
+            bucket = branch_map[branch_value]
+            bucket["revenue"] += subtotal
+            bucket["quantity"] += qty
+            bucket["profit"] += (subtotal - cost)
+        for branch_name, values in sorted(branch_map.items()):
+            branch_summary.append({
+                "branchId": branch_name,
+                "branchName": next((branch.get("branch_name") for branch in branches if str(branch.get("branch_id")) == branch_name), branch_name),
+                "revenue": values["revenue"],
+                "quantity": values["quantity"],
+                "profit": values["profit"],
+            })
+
+    return {
+        "branches": [{
+            "id": str(branch.get("branch_id")),
+            "name": str(branch.get("branch_name") or "Unknown branch"),
+            "city": str(branch.get("city") or "")
+        } for branch in branches],
+        "selectedBranch": branch_id,
+        "hasProfit": True,
+        "summary": {
+            "totalRevenue": total_revenue,
+            "totalQuantity": total_quantity,
+            "estimatedProfit": total_profit,
+            "orders": len(selected_orders),
+        },
+        "groups": groups_response,
+        "rows": rows,
+        "trending": trending,
+        "associationRules": association_rules,
+        "categoryBreakdown": category_breakdown,
+        "branchBreakdown": branch_summary,
+    }
 # ============================================================
 # ANALYTICS DASHBOARD
 # ============================================================
