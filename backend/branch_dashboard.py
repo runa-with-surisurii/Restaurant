@@ -5,10 +5,8 @@ from collections import defaultdict
 
 router = APIRouter()
 
-
 def branch_query(branch_id):
     return {"$or": [{"branchId": branch_id}, {"branch_id": branch_id}, {"branchId": str(branch_id)}, {"branch_id": str(branch_id)}]}
-
 
 def order_date(order):
     value = order.get("confirmedAt") or order.get("createdAt") or order.get("order_date") or order.get("date")
@@ -21,7 +19,6 @@ def order_date(order):
         except Exception: return None
     return None
 
-
 def menu_cost(menu_id):
     total = 0.0
     for row in db["menu_ingredients"].find({"$or": [{"menu_id": menu_id}, {"menu_id": str(menu_id)}]}):
@@ -33,7 +30,6 @@ def menu_cost(menu_id):
             total += qty * cost
     return total
 
-
 def order_financials(order):
     sales = 0.0; cost = 0.0
     for item in order.get("items", []):
@@ -42,15 +38,12 @@ def order_financials(order):
         menu_id = item.get("menu_id") or item.get("menuItemId") or item.get("dishId")
         sales += qty * price
         if menu_id is not None: cost += qty * menu_cost(menu_id)
-    if not order.get("items"):
-        sales = float(order.get("total", order.get("total_amount", 0)) or 0)
+    if not order.get("items"): sales = float(order.get("total", order.get("total_amount", 0)) or 0)
     return sales, cost, max(0.0, sales - cost)
-
 
 def get_inventory_usage(branch_id, limit=10):
     rows = list(db["inventory_transactions"].find(branch_query(branch_id)).sort("createdAt", -1).limit(limit))
     return [{"ingredient": row.get("IngredientName") or row.get("ingredient_name") or "Unknown", "used": row.get("used", row.get("Used", 0)), "unit": row.get("unit", row.get("Unit", "")), "remaining": row.get("remaining", row.get("Remaining", 0)), "orderId": row.get("orderId", row.get("order_id", "")), "date": str(row.get("createdAt", row.get("date", "")))} for row in rows]
-
 
 def recent_menus_sold(orders, limit=2):
     sorted_orders = sorted(orders, key=lambda o: order_date(o) or datetime.min, reverse=True)
@@ -65,7 +58,6 @@ def recent_menus_sold(orders, limit=2):
             if len(result) >= limit: return result
     return result
 
-
 def linear_regression_predict(values, horizon):
     n = len(values)
     if n == 0: return [0.0] * horizon
@@ -75,7 +67,6 @@ def linear_regression_predict(values, horizon):
     slope = sum((xi - xm) * (yi - ym) for xi, yi in zip(x, values)) / den if den else 0.0
     intercept = ym - slope * xm
     return [round(max(0.0, intercept + slope * (n + i)), 2) for i in range(1, horizon + 1)]
-
 
 def sales_prediction(branch_id, history_days=30, horizon=7):
     today = datetime.now().date(); start = today - timedelta(days=history_days - 1); daily = defaultdict(float)
@@ -88,17 +79,13 @@ def sales_prediction(branch_id, history_days=30, horizon=7):
     forecast = [{"date": str(today + timedelta(days=i)), "predictedSales": predictions[i - 1]} for i in range(1, horizon + 1)]
     return {"algorithm": "Linear Regression", "historyDays": history_days, "forecastDays": horizon, "historicalSales": history, "forecast": forecast, "nextDay": predictions[0] if predictions else 0.0}
 
-
 def calculate_growth(branch_id):
-    """Calculate 7-day gross-sales growth versus the preceding 7 days.
-    Gross sales are used here so ingredient-cost data cannot force growth to 0%
-    when valid menu prices exist. A new branch with current sales gets 100% growth.
-    """
+    """Compare today's confirmed gross sales with yesterday's confirmed gross sales."""
     now = datetime.now()
-    current_start = now - timedelta(days=7)
-    previous_start = now - timedelta(days=14)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_start = today_start - timedelta(days=1)
     current_sales = 0.0
-    previous_sales = 0.0
+    yesterday_sales = 0.0
     valid_statuses = {"confirmed", "completed", "complete", "paid"}
 
     for order in db["orders"].find(branch_query(branch_id)):
@@ -108,17 +95,14 @@ def calculate_growth(branch_id):
         if not dt:
             continue
         sales = order_financials(order)[0]
-        if dt >= current_start:
+        if dt >= today_start:
             current_sales += sales
-        elif previous_start <= dt < current_start:
-            previous_sales += sales
+        elif yesterday_start <= dt < today_start:
+            yesterday_sales += sales
 
-    if current_sales <= 0:
+    if yesterday_sales <= 0:
         return 0.0
-    if previous_sales <= 0:
-        return 100.0
-    return round(((current_sales - previous_sales) / previous_sales) * 100, 2)
-
+    return round(((current_sales - yesterday_sales) / yesterday_sales) * 100, 2)
 
 @router.get("/api/branch/dashboard/{branch_id}")
 def branch_dashboard(branch_id: str):
@@ -138,10 +122,8 @@ def branch_dashboard(branch_id: str):
     usage = get_inventory_usage(branch_id, 10); prediction = sales_prediction(branch_id); recent_menus = recent_menus_sold(all_orders, 2)
     return {"orders": len(today_orders), "totalOrders": len(all_orders), "revenue": round(today_revenue, 2), "todaySales": round(today_sales, 2), "totalRevenue": round(total_revenue, 2), "customers": len(today_orders), "itemsSold": items_sold, "growth": calculate_growth(branch_id), "weekly_sales": weekly_sales, "inventory_usage": usage, "inventoryUsage": usage, "recent_menus": recent_menus, "recentMenus": recent_menus, "current_menu_sold": recent_menus[0] if recent_menus else None, "currentMenuSold": recent_menus[0] if recent_menus else None, "sales_prediction": prediction, "salesPrediction": prediction}
 
-
 @router.get("/api/branch/dashboard/{branch_id}/sales-prediction")
 def branch_sales_prediction(branch_id: str): return sales_prediction(branch_id)
-
 
 @router.get("/api/dashboard/inventory-usage/{branch_id}")
 def inventory_usage(branch_id: str): return {"success": True, "data": get_inventory_usage(branch_id, 20)}
