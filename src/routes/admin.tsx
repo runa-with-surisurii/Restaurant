@@ -5,7 +5,7 @@ import { BranchShellProvider } from "@/components/branch-admin/BranchShell";
 import { getUnauthorizedRedirect } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Main Admin — Taste & Treasure" }, { name: "description", content: "HQ operations console for Taste & Treasure restaurant chain." }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Main Admin — Ember & Oak" }, { name: "description", content: "HQ operations console for Ember & Oak restaurant chain." }, { name: "robots", content: "noindex" }] }),
   component: AdminLayout,
 });
 
