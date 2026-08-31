@@ -127,3 +127,51 @@ def branch_sales_prediction(branch_id: str): return sales_prediction(branch_id)
 
 @router.get("/api/dashboard/inventory-usage/{branch_id}")
 def inventory_usage(branch_id: str): return {"success": True, "data": get_inventory_usage(branch_id, 20)}
+
+@router.get("/api/admin/dashboard")
+def admin_dashboard():
+    """Return weekly admin KPIs and branch ranking from the same MongoDB orders collection used by branch dashboards.
+
+    The weekly window is anchored to the newest order in the database. This is important for the seeded
+    dataset, whose dates are historical; using datetime.now() would otherwise make the dashboard show zero.
+    """
+    valid_statuses = {"confirmed", "completed", "complete", "paid"}
+    orders = []
+    for order in db["orders"].find({}):
+        if str(order.get("status", "")).strip().lower() not in valid_statuses:
+            continue
+        dt = order_date(order)
+        if dt:
+            orders.append((order, dt))
+
+    branches = list(db["branches"].find({}, {"_id": 0}))
+    branch_names = {}
+    for branch in branches:
+        bid = str(branch.get("branch_id") or branch.get("branchId") or branch.get("storeNumber") or "")
+        branch_names[bid] = branch.get("branch_name") or branch.get("branchName") or branch.get("city") or bid
+
+    if not orders:
+        return {"total_orders": 0, "branch_orders": [], "week_start": None, "week_end": None}
+
+    latest_date = max(dt for _, dt in orders)
+    week_start = (latest_date - timedelta(days=latest_date.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    week_end = week_start + timedelta(days=7)
+
+    weekly = [(order, dt) for order, dt in orders if week_start <= dt < week_end]
+    counts = defaultdict(int)
+    for order, _ in weekly:
+        bid = str(order.get("branch_id") or order.get("branchId") or "Unknown")
+        counts[bid] += 1
+
+    ranking = [
+        {"storeNumber": bid, "orders": count, "branchName": branch_names.get(bid, bid)}
+        for bid, count in counts.items()
+    ]
+    ranking.sort(key=lambda row: (-row["orders"], str(row["storeNumber"])))
+
+    return {
+        "total_orders": len(weekly),
+        "branch_orders": ranking,
+        "week_start": week_start.date().isoformat(),
+        "week_end": (week_end - timedelta(days=1)).date().isoformat(),
+    }
