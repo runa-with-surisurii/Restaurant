@@ -83,7 +83,8 @@ def calculate_growth(branch_id):
         amount = order_financials(order)[2]
         if dt >= current_start: current += amount
         elif dt >= previous_start: previous += amount
-    return round(((current - previous) / previous) * 100, 2) if previous else 0.0
+    if previous <= 0: return 0.0
+    return round(max(0.0, ((current - previous) / previous) * 100), 2)
 
 
 def linear_regression_predict(values, horizon):
@@ -115,7 +116,9 @@ def branch_dashboard(branch_id: str):
     all_orders = list(db["orders"].find({"$and": [branch_query(branch_id), {"status": {"$in": statuses}}]}))
     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     today_orders = [o for o in all_orders if order_date(o) and order_date(o) >= today_start]
-    total_revenue = sum(order_financials(o)[2] for o in all_orders); today_revenue = sum(order_financials(o)[2] for o in today_orders)
+    total_revenue = sum(order_financials(o)[2] for o in all_orders)
+    today_revenue = sum(order_financials(o)[2] for o in today_orders)
+    today_sales = sum(order_financials(o)[0] for o in today_orders)
     items_sold = sum(int(item.get("quantity", item.get("qty", 1)) or 1) for order in all_orders for item in order.get("items", []))
     sales_map = defaultdict(float); week_start = today_start - timedelta(days=6)
     for order in all_orders:
@@ -123,7 +126,7 @@ def branch_dashboard(branch_id: str):
         if dt and dt >= week_start: sales_map[dt.strftime("%a")] += order_financials(order)[2]
     weekly_sales = [{"day": d, "sales": round(sales_map[d], 2)} for d in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]]
     usage = get_inventory_usage(branch_id, 10); prediction = sales_prediction(branch_id); recent_menus = recent_menus_sold(all_orders, 2)
-    return {"orders": len(today_orders), "totalOrders": len(all_orders), "revenue": round(today_revenue, 2), "totalRevenue": round(total_revenue, 2), "customers": len(today_orders), "itemsSold": items_sold, "growth": calculate_growth(branch_id), "weekly_sales": weekly_sales, "inventory_usage": usage, "inventoryUsage": usage, "recent_menus": recent_menus, "recentMenus": recent_menus, "current_menu_sold": recent_menus[0] if recent_menus else None, "currentMenuSold": recent_menus[0] if recent_menus else None, "sales_prediction": prediction, "salesPrediction": prediction}
+    return {"orders": len(today_orders), "totalOrders": len(all_orders), "revenue": round(today_revenue, 2), "todaySales": round(today_sales, 2), "totalRevenue": round(total_revenue, 2), "customers": len(today_orders), "itemsSold": items_sold, "growth": calculate_growth(branch_id), "weekly_sales": weekly_sales, "inventory_usage": usage, "inventoryUsage": usage, "recent_menus": recent_menus, "recentMenus": recent_menus, "current_menu_sold": recent_menus[0] if recent_menus else None, "currentMenuSold": recent_menus[0] if recent_menus else None, "sales_prediction": prediction, "salesPrediction": prediction}
 
 
 @router.get("/api/branch/dashboard/{branch_id}/sales-prediction")
