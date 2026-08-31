@@ -29,7 +29,7 @@ function BranchDashboard(){
   const growth = Number(analytics?.growth || 0);
   const growthLabel = `${growth > 0 ? "+" : ""}${growth.toLocaleString()}%`;
   return <div className="min-h-screen bg-muted/30 p-8 space-y-8">
-    <div><h1 className="text-5xl font-bold">Branch Analytics Dashboard</h1><p className="mt-2 text-muted-foreground">Taste & Treasure — Real-time branch performance overview</p></div>
+    <div><h1 className="text-5xl font-bold">Branch Analytics Dashboard</h1><p className="mt-2 text-muted-foreground">Ember & Oak — Real-time branch performance overview</p></div>
     <div className="grid gap-5 md:grid-cols-5">
       <KpiCard title="Today's Orders" value={analytics?.orders?.toLocaleString() || "0"} icon={<ShoppingBag/>}/><KpiCard title="Revenue" value={`$${analytics?.revenue?.toLocaleString() || 0}`} icon={<DollarSign/>}/><KpiCard title="Today's Sales" value={`$${(analytics?.todaySales ?? analytics?.revenue ?? 0).toLocaleString()}`} icon={<DollarSign/>}/><KpiCard title="Customers" value={analytics?.customers?.toLocaleString() || "0"} icon={<Users/>}/><KpiCard title="Growth" value={growthLabel} icon={<TrendingUp/>}/>
     </div>

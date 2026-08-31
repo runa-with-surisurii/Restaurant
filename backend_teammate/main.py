@@ -12,7 +12,7 @@ from sales_report import router as sales_report_router
 from fastapi.responses import Response
 
 app = FastAPI(
-    title="Taste & Treasure Restaurant API",
+    title="Ember & Oak Restaurant API",
     version="1.0.0"
 )
 app.include_router(menu_router)
@@ -63,7 +63,7 @@ def root():
 
     return {
         "message":
-        "Taste & Treasure API is running"
+        "Ember & Oak API is running"
     }
 
 
@@ -441,7 +441,7 @@ def analytics_dashboard():
 
 
         "restaurant":
-        "Taste & Treasure",
+        "Ember & Oak",
 
 
         "total_orders":
@@ -553,7 +553,7 @@ def admin_dashboard():
 
 
         "restaurant":
-        "Taste & Treasure",
+        "Ember & Oak",
 
 
         "total_orders":
@@ -652,7 +652,7 @@ def startup_event():
 
 
         print("==============================")
-        print("Taste & Treasure API Started")
+        print("Ember & Oak API Started")
         print("MongoDB Connected")
         print("Database: restaurant_db")
         print("==============================")
