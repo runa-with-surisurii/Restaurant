@@ -47,16 +47,12 @@ def order_financials(order):
 
 def get_inventory_usage(branch_id, limit=10):
     rows = list(db["inventory_transactions"].find(branch_query(branch_id)).sort("createdAt", -1).limit(limit))
-    result = []
-    for row in rows:
-        result.append({"ingredient": row.get("IngredientName") or row.get("ingredient_name") or "Unknown", "used": row.get("used", row.get("Used", 0)), "unit": row.get("unit", row.get("Unit", "")), "remaining": row.get("remaining", row.get("Remaining", 0)), "orderId": row.get("orderId", row.get("order_id", "")), "date": str(row.get("createdAt", row.get("date", "")))})
-    return result
+    return [{"ingredient": row.get("IngredientName") or row.get("ingredient_name") or "Unknown", "used": row.get("used", row.get("Used", 0)), "unit": row.get("unit", row.get("Unit", "")), "remaining": row.get("remaining", row.get("Remaining", 0)), "orderId": row.get("orderId", row.get("order_id", "")), "date": str(row.get("createdAt", row.get("date", "")))} for row in rows]
 
 
 def recent_menus_sold(orders, limit=2):
     sorted_orders = sorted(orders, key=lambda o: order_date(o) or datetime.min, reverse=True)
-    result = []
-    seen = set()
+    result = []; seen = set()
     for order in sorted_orders:
         for item in order.get("items", []):
             menu_id = item.get("menu_id") or item.get("menuItemId") or item.get("dishId")
@@ -66,25 +62,6 @@ def recent_menus_sold(orders, limit=2):
             result.append({"menuId": menu_id, "name": item.get("name", "Unknown"), "quantity": int(item.get("quantity", item.get("qty", 1)) or 1), "image": item.get("image") or "/menu/default.png"})
             if len(result) >= limit: return result
     return result
-
-
-def latest_menu_sold(orders):
-    menus = recent_menus_sold(orders, 1)
-    return menus[0] if menus else None
-
-
-def calculate_growth(branch_id):
-    today = datetime.now(); current_start = today - timedelta(days=7); previous_start = today - timedelta(days=14)
-    current = previous = 0.0
-    for order in db["orders"].find(branch_query(branch_id)):
-        if str(order.get("status", "")).lower() not in {"confirmed", "completed", "complete", "paid"}: continue
-        dt = order_date(order)
-        if not dt: continue
-        amount = order_financials(order)[2]
-        if dt >= current_start: current += amount
-        elif dt >= previous_start: previous += amount
-    if previous <= 0: return 0.0
-    return round(max(0.0, ((current - previous) / previous) * 100), 2)
 
 
 def linear_regression_predict(values, horizon):
@@ -108,6 +85,25 @@ def sales_prediction(branch_id, history_days=30, horizon=7):
     predictions = linear_regression_predict(history, horizon)
     forecast = [{"date": str(today + timedelta(days=i)), "predictedSales": predictions[i - 1]} for i in range(1, horizon + 1)]
     return {"algorithm": "Linear Regression", "historyDays": history_days, "forecastDays": horizon, "historicalSales": history, "forecast": forecast, "nextDay": predictions[0] if predictions else 0.0}
+
+
+def calculate_growth(branch_id):
+    """Compare the latest 7-day net sales with the preceding 7 days.
+    If there is no previous-period sales but the branch has current sales,
+    report 100% growth rather than misleadingly displaying 0%.
+    """
+    today = datetime.now(); current_start = today - timedelta(days=7); previous_start = today - timedelta(days=14)
+    current = previous = 0.0
+    for order in db["orders"].find(branch_query(branch_id)):
+        if str(order.get("status", "")).lower() not in {"confirmed", "completed", "complete", "paid"}: continue
+        dt = order_date(order)
+        if not dt: continue
+        amount = order_financials(order)[2]
+        if dt >= current_start: current += amount
+        elif dt >= previous_start: previous += amount
+    if current <= 0: return 0.0
+    if previous <= 0: return 100.0
+    return round(max(0.0, ((current - previous) / previous) * 100), 2)
 
 
 @router.get("/api/branch/dashboard/{branch_id}")
