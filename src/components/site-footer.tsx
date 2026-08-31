@@ -9,7 +9,7 @@ export function SiteFooter() {
             <span className="grid size-9 place-items-center rounded-lg bg-gradient-ember">
               <Flame className="size-5 text-primary-foreground" />
             </span>
-            <span className="font-display text-2xl">Taste &amp; Treasure</span>
+            <span className="font-display text-2xl">Ember &amp; Oak</span>
           </div>
           <p className="mt-3 text-sm text-secondary-foreground/70">
             Fire-kitchen classics, delivered from four kitchens across the country.
@@ -41,7 +41,7 @@ export function SiteFooter() {
         </div>
       </div>
       <div className="border-t border-white/10 py-4 text-center text-xs text-secondary-foreground/50">
-        © {new Date().getFullYear()} Taste &amp; Treasure. All rights reserved.
+        © {new Date().getFullYear()} Ember &amp; Oak. All rights reserved.
       </div>
     </footer>
   );
