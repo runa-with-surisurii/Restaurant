@@ -12,10 +12,12 @@ def branch_query(branch_id):
 
 def order_date(order):
     value = order.get("confirmedAt") or order.get("createdAt") or order.get("order_date") or order.get("date")
-    if isinstance(value, datetime): return value
+    if isinstance(value, datetime): return value.replace(tzinfo=None) if value.tzinfo else value
     if hasattr(value, "date"): return value
     if isinstance(value, str):
-        try: return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return parsed.replace(tzinfo=None)
         except Exception: return None
     return None
 
@@ -88,22 +90,34 @@ def sales_prediction(branch_id, history_days=30, horizon=7):
 
 
 def calculate_growth(branch_id):
-    """Compare the latest 7-day net sales with the preceding 7 days.
-    If there is no previous-period sales but the branch has current sales,
-    report 100% growth rather than misleadingly displaying 0%.
+    """Calculate 7-day gross-sales growth versus the preceding 7 days.
+    Gross sales are used here so ingredient-cost data cannot force growth to 0%
+    when valid menu prices exist. A new branch with current sales gets 100% growth.
     """
-    today = datetime.now(); current_start = today - timedelta(days=7); previous_start = today - timedelta(days=14)
-    current = previous = 0.0
+    now = datetime.now()
+    current_start = now - timedelta(days=7)
+    previous_start = now - timedelta(days=14)
+    current_sales = 0.0
+    previous_sales = 0.0
+    valid_statuses = {"confirmed", "completed", "complete", "paid"}
+
     for order in db["orders"].find(branch_query(branch_id)):
-        if str(order.get("status", "")).lower() not in {"confirmed", "completed", "complete", "paid"}: continue
+        if str(order.get("status", "")).strip().lower() not in valid_statuses:
+            continue
         dt = order_date(order)
-        if not dt: continue
-        amount = order_financials(order)[2]
-        if dt >= current_start: current += amount
-        elif dt >= previous_start: previous += amount
-    if current <= 0: return 0.0
-    if previous <= 0: return 100.0
-    return round(max(0.0, ((current - previous) / previous) * 100), 2)
+        if not dt:
+            continue
+        sales = order_financials(order)[0]
+        if dt >= current_start:
+            current_sales += sales
+        elif previous_start <= dt < current_start:
+            previous_sales += sales
+
+    if current_sales <= 0:
+        return 0.0
+    if previous_sales <= 0:
+        return 100.0
+    return round(((current_sales - previous_sales) / previous_sales) * 100, 2)
 
 
 @router.get("/api/branch/dashboard/{branch_id}")
