@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from database import db
 from datetime import datetime
 from bson import ObjectId
+from order_detail_store import save_order_details
 
 router = APIRouter()
 
@@ -160,6 +161,7 @@ def create_order(order: dict):
         oi_doc.update({"order_id": order_id, "orderItemId": "OI" + order_id[-6:], "branch_id": branch_id})
         db["order_items"].insert_one(oi_doc)
 
+    save_order_details(order_id, branch_id, order_items)
     return {"success": True, "orderId": order_id, "order_id": order_id}
 
 
@@ -230,6 +232,9 @@ def confirm_order(order_id: str):
 
         existing = list(db["order_items"].find({"order_id": order_id_value}, {"_id": 0}))
 
+    # Keep order_details synchronized for both newly-created and legacy pending orders.
+    save_order_details(order_id_value, branch_id, existing or order.get("items", []))
+
     stock_updates = []
 
     for item in existing:
@@ -252,7 +257,6 @@ def confirm_order(order_id: str):
             if ingredient_id is None or required <= 0:
                 continue
 
-            # Match branch inventory without relying on the ID's BSON type.
             inv_candidates = []
             for field in ("branch_id", "branchId"):
                 for value in (branch_id, str(branch_id)):
