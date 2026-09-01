@@ -19,6 +19,16 @@ def order_date(order):
         except Exception: return None
     return None
 
+def get_order_items(order):
+    """Return embedded items or the normalized order_items collection for legacy dataset orders."""
+    items = order.get("items") or []
+    if items:
+        return items
+    oid = order.get("order_id") or order.get("orderId") or order.get("_id")
+    if oid is None:
+        return []
+    return list(db["order_items"].find({"order_id": str(oid)}, {"_id": 0}))
+
 def menu_cost(menu_id):
     total = 0.0
     for row in db["menu_ingredients"].find({"$or": [{"menu_id": menu_id}, {"menu_id": str(menu_id)}]}):
@@ -32,13 +42,15 @@ def menu_cost(menu_id):
 
 def order_financials(order):
     sales = 0.0; cost = 0.0
-    for item in order.get("items", []):
+    items = get_order_items(order)
+    for item in items:
         qty = float(item.get("quantity", item.get("qty", 1)) or 1)
         price = float(item.get("price", item.get("unit_price", 0)) or 0)
         menu_id = item.get("menu_id") or item.get("menuItemId") or item.get("dishId")
         sales += qty * price
         if menu_id is not None: cost += qty * menu_cost(menu_id)
-    if not order.get("items"): sales = float(order.get("total", order.get("total_amount", 0)) or 0)
+    if not items:
+        sales = float(order.get("total", order.get("total_amount", 0)) or 0)
     return sales, cost, max(0.0, sales - cost)
 
 def get_inventory_usage(branch_id, limit=10):
@@ -49,12 +61,12 @@ def recent_menus_sold(orders, limit=2):
     sorted_orders = sorted(orders, key=lambda o: order_date(o) or datetime.min, reverse=True)
     result = []; seen = set()
     for order in sorted_orders:
-        for item in order.get("items", []):
+        for item in get_order_items(order):
             menu_id = item.get("menu_id") or item.get("menuItemId") or item.get("dishId")
             key = str(menu_id or item.get("name") or "unknown")
             if key in seen: continue
             seen.add(key)
-            result.append({"menuId": menu_id, "name": item.get("name", "Unknown"), "quantity": int(item.get("quantity", item.get("qty", 1)) or 1), "image": item.get("image") or "/menu/default.png"})
+            result.append({"menuId": menu_id, "name": item.get("name") or item.get("menu_name") or "Unknown", "quantity": int(item.get("quantity", item.get("qty", 1)) or 1), "image": item.get("image") or "/menu/default.png"})
             if len(result) >= limit: return result
     return result
 
@@ -69,15 +81,32 @@ def linear_regression_predict(values, horizon):
     return [round(max(0.0, intercept + slope * (n + i)), 2) for i in range(1, horizon + 1)]
 
 def sales_prediction(branch_id, history_days=30, horizon=7):
-    today = datetime.now().date(); start = today - timedelta(days=history_days - 1); daily = defaultdict(float)
+    valid_statuses = {"confirmed", "completed", "complete", "paid"}
+    branch_orders = []
     for order in db["orders"].find(branch_query(branch_id)):
-        if str(order.get("status", "")).lower() not in {"confirmed", "completed", "complete", "paid"}: continue
+        if str(order.get("status", "")).strip().lower() not in valid_statuses:
+            continue
         dt = order_date(order)
-        if dt and start <= dt.date() <= today: daily[dt.date()] += order_financials(order)[2]
+        if dt:
+            branch_orders.append((order, dt))
+
+    # Use the latest date belonging to this branch instead of the computer's current date.
+    # This keeps seeded/historical branch data usable for the forecast.
+    if branch_orders:
+        anchor_date = max(dt for _, dt in branch_orders).date()
+    else:
+        anchor_date = datetime.now().date()
+
+    start = anchor_date - timedelta(days=history_days - 1)
+    daily = defaultdict(float)
+    for order, dt in branch_orders:
+        if start <= dt.date() <= anchor_date:
+            daily[dt.date()] += order_financials(order)[2]
+
     history = [round(daily[start + timedelta(days=i)], 2) for i in range(history_days)]
     predictions = linear_regression_predict(history, horizon)
-    forecast = [{"date": str(today + timedelta(days=i)), "predictedSales": predictions[i - 1]} for i in range(1, horizon + 1)]
-    return {"algorithm": "Linear Regression", "historyDays": history_days, "forecastDays": horizon, "historicalSales": history, "forecast": forecast, "nextDay": predictions[0] if predictions else 0.0}
+    forecast = [{"date": str(anchor_date + timedelta(days=i)), "predictedSales": predictions[i - 1]} for i in range(1, horizon + 1)]
+    return {"algorithm": "Linear Regression", "historyDays": history_days, "forecastDays": horizon, "anchorDate": str(anchor_date), "historicalSales": history, "forecast": forecast, "nextDay": predictions[0] if predictions else 0.0}
 
 def calculate_growth(branch_id):
     """Compare today's confirmed gross sales with yesterday's confirmed gross sales."""
@@ -113,7 +142,7 @@ def branch_dashboard(branch_id: str):
     total_revenue = sum(order_financials(o)[2] for o in all_orders)
     today_revenue = sum(order_financials(o)[2] for o in today_orders)
     today_sales = sum(order_financials(o)[0] for o in today_orders)
-    items_sold = sum(int(item.get("quantity", item.get("qty", 1)) or 1) for order in all_orders for item in order.get("items", []))
+    items_sold = sum(int(item.get("quantity", item.get("qty", 1)) or 1) for order in all_orders for item in get_order_items(order))
     sales_map = defaultdict(float); week_start = today_start - timedelta(days=6)
     for order in all_orders:
         dt = order_date(order)
@@ -130,11 +159,7 @@ def inventory_usage(branch_id: str): return {"success": True, "data": get_invent
 
 @router.get("/api/admin/dashboard")
 def admin_dashboard():
-    """Return weekly admin KPIs and branch ranking from the same MongoDB orders collection used by branch dashboards.
-
-    The weekly window is anchored to the newest order in the database. This is important for the seeded
-    dataset, whose dates are historical; using datetime.now() would otherwise make the dashboard show zero.
-    """
+    """Return weekly admin KPIs and branch ranking from the same MongoDB orders collection used by branch dashboards."""
     valid_statuses = {"confirmed", "completed", "complete", "paid"}
     orders = []
     for order in db["orders"].find({}):
