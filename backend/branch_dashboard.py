@@ -124,21 +124,29 @@ def sales_prediction(branch_id, history_days=30, horizon=7):
     return {"algorithm": "Linear Regression", "historyDays": history_days, "forecastDays": horizon, "anchorDate": str(anchor), "historicalSales": history, "forecast": forecast, "nextDay": predictions[0] if predictions else 0.0}
 
 def calculate_growth(branch_id):
-    now = datetime.now(); today_start = now.replace(hour=0, minute=0, second=0, microsecond=0); yesterday_start = today_start - timedelta(days=1); valid = {"confirmed", "completed", "complete", "paid"}; today = 0.0; yesterday = 0.0
+    valid = {"confirmed", "completed", "complete", "paid"}
+    now = datetime.now()
+    current_anchor = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    dated = []
     for order in db["orders"].find(branch_query(branch_id)):
-        if str(order.get("status", "")).strip().lower() not in valid: continue
-        dt = order_date(order)
-        if not dt: continue
-        sales = order_financials(order)[0]
-        if dt >= today_start: today += sales
-        elif yesterday_start <= dt < today_start: yesterday += sales
+        if str(order.get("status", "")).strip().lower() in valid:
+            dt = order_date(order)
+            if dt: dated.append((dt, order_financials(order)[0]))
     for row in get_orphan_order_details(branch_id):
         dt = detail_date(row)
-        if not dt: continue
-        if dt >= today_start: today += detail_sales(row)
-        elif yesterday_start <= dt < today_start: yesterday += detail_sales(row)
-    if yesterday <= 0: return 0.0
-    return round(((today - yesterday) / yesterday) * 100, 2)
+        if dt: dated.append((dt, detail_sales(row)))
+    if not dated: return 0.0
+    latest = max(dt for dt, _ in dated).replace(hour=0, minute=0, second=0, microsecond=0)
+    if any(dt >= current_anchor - timedelta(days=6) for dt, _ in dated):
+        end = current_anchor + timedelta(days=1)
+    else:
+        end = latest + timedelta(days=1)
+    current_start = end - timedelta(days=7)
+    previous_start = current_start - timedelta(days=7)
+    current_sales = sum(sales for dt, sales in dated if current_start <= dt < end)
+    previous_sales = sum(sales for dt, sales in dated if previous_start <= dt < current_start)
+    if previous_sales <= 0: return 100.0 if current_sales > 0 else 0.0
+    return round(((current_sales - previous_sales) / previous_sales) * 100, 2)
 
 @router.get("/api/branch/dashboard/{branch_id}")
 def branch_dashboard(branch_id: str):
