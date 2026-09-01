@@ -1,5 +1,5 @@
-branch_id,branch_name,city
-BR001,Hlaing Taste,Hlaing
-BR002,Downtown Taste,Kyauktada
-BR003,Sanchaung Kitchen,Sanchaung
-BR004,Bahan Kitchen,Bahan
+branch_id,branch_name,city,state
+BR001,Hlaing Taste,Hlaing,Yangon
+BR002,Downtown Taste,Kyauktada,Yangon
+BR003,Sanchaung Kitchen,Sanchaung,Yangon
+BR004,Bahan Kitchen,Bahan,Yangon
