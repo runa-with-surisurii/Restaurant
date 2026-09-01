@@ -106,6 +106,47 @@ def enrich_orders(orders):
     return orders
 
 
+def _find_inventory(branch_id, ingredient_id):
+    """Find one inventory row for a branch/ingredient regardless of legacy field casing."""
+    candidates = []
+    branch_values = [branch_id, str(branch_id)]
+    ingredient_values = [ingredient_id, str(ingredient_id)]
+
+    for branch_field in ("branch_id", "branchId"):
+        for branch_value in branch_values:
+            for ingredient_field in ("ingredient_id", "IngredientId"):
+                for ingredient_value in ingredient_values:
+                    doc = db["branch_inventory"].find_one({
+                        branch_field: branch_value,
+                        ingredient_field: ingredient_value,
+                    })
+                    if doc:
+                        candidates.append(doc)
+
+    return candidates[0] if candidates else None
+
+
+def _find_ingredient(ingredient_id):
+    for field in ("ingredient_id", "IngredientId"):
+        for value in (ingredient_id, str(ingredient_id)):
+            doc = db["ingredients"].find_one({field: value}, {"_id": 0})
+            if doc:
+                return doc
+    return None
+
+
+def _order_transaction_exists(order_id, branch_id, ingredient_id):
+    return db["inventory_transactions"].find_one({
+        "orderId": order_id,
+        "IngredientId": ingredient_id,
+        "branchId": branch_id,
+    }) or db["inventory_transactions"].find_one({
+        "order_id": order_id,
+        "ingredient_id": ingredient_id,
+        "branch_id": branch_id,
+    })
+
+
 @router.post("/api/orders")
 def create_order(order: dict):
     items = []
@@ -193,12 +234,20 @@ def confirm_order(order_id: str):
     if not order:
         return {"success": False, "message": "Order not found"}
 
-    current_status = str(order.get("status", "")).lower()
-    if current_status in {"confirmed", "completed"}:
-        return {"success": False, "message": "Already confirmed"}
-
     branch_id = order.get("branchId") or order.get("branch_id")
     order_id_value = str(order.get("order_id") or order["_id"])
+
+    # A legacy order can already be marked confirmed/completed but still have no
+    # inventory transactions. In that case we must repair/deduct stock once.
+    existing_transactions = db["inventory_transactions"].count_documents({
+        "$or": [
+            {"orderId": order_id_value},
+            {"order_id": order_id_value},
+        ]
+    })
+    if str(order.get("status", "")).lower() in {"confirmed", "completed"} and existing_transactions > 0:
+        return {"success": False, "message": "Already confirmed", "stockUpdated": []}
+
     db["orders"].update_one({"_id": order["_id"]}, {"$set": {"order_id": order_id_value}})
 
     existing = list(db["order_items"].find({"order_id": order_id_value}, {"_id": 0}))
@@ -232,10 +281,13 @@ def confirm_order(order_id: str):
 
         existing = list(db["order_items"].find({"order_id": order_id_value}, {"_id": 0}))
 
-    # Keep order_details synchronized for both newly-created and legacy pending orders.
     save_order_details(order_id_value, branch_id, existing or order.get("items", []))
 
-    stock_updates = []
+    # Build the complete deduction list first. This prevents partially reducing
+    # inventory when one ingredient is missing or has insufficient stock.
+    deductions = []
+    missing = []
+    insufficient = []
 
     for item in existing:
         menu_id = item.get("menu_id") or item.get("menuItemId") or item.get("MenuItemId")
@@ -257,57 +309,32 @@ def confirm_order(order_id: str):
             if ingredient_id is None or required <= 0:
                 continue
 
-            inv_candidates = []
-            for field in ("branch_id", "branchId"):
-                for value in (branch_id, str(branch_id)):
-                    inv_candidates.extend(list(db["branch_inventory"].find({field: value}, {"_id": 1, "branch_id": 1, "branchId": 1, "ingredient_id": 1, "IngredientId": 1, "stock_quantity": 1, "Stock": 1, "unit": 1, "Unit": 1, "ingredient_name": 1, "IngredientName": 1})))
+            # If this exact order/ingredient was already deducted, do not deduct it again.
+            if _order_transaction_exists(order_id_value, branch_id, ingredient_id):
+                continue
 
-            inv = None
-            for candidate in inv_candidates:
-                cid = candidate.get("ingredient_id")
-                if cid is None:
-                    cid = candidate.get("IngredientId")
-                if cid is not None and str(cid) == str(ingredient_id):
-                    inv = candidate
-                    break
-
-            ingredient = None
-            for value in (ingredient_id, str(ingredient_id)):
-                ingredient = db["ingredients"].find_one({"ingredient_id": value}, {"_id": 0})
-                if ingredient:
-                    break
-            if not ingredient:
-                ingredient = db["ingredients"].find_one({"IngredientId": ingredient_id}, {"_id": 0})
-
+            inv = _find_inventory(branch_id, ingredient_id)
             if not inv:
-                if not ingredient:
-                    continue
-                name = ingredient.get("ingredient_name") or ingredient.get("IngredientName") or str(ingredient_id)
-                unit = ingredient.get("unit") or ingredient.get("Unit") or "unit"
-                new_doc = {
-                    "branch_id": branch_id,
-                    "branchId": branch_id,
-                    "ingredient_id": ingredient_id,
-                    "IngredientId": ingredient_id,
-                    "ingredient_name": name,
-                    "IngredientName": name,
-                    "stock_quantity": 1000,
-                    "Stock": 1000,
-                    "unit": unit,
-                    "Unit": unit,
-                }
-                result = db["branch_inventory"].insert_one(new_doc)
-                inv = dict(new_doc)
-                inv["_id"] = result.inserted_id
+                missing.append(str(ingredient_id))
+                continue
 
+            ingredient = _find_ingredient(ingredient_id)
             stock = float(inv.get("stock_quantity") if inv.get("stock_quantity") is not None else inv.get("Stock", 0))
             stock_unit = inv.get("unit") or inv.get("Unit") or (ingredient or {}).get("unit") or "unit"
             recipe_unit = recipe.get("unit") or recipe.get("Unit") or stock_unit
             used = convert_unit(required, recipe_unit, stock_unit)
+
             if used <= 0:
                 continue
+            if stock < used:
+                insufficient.append({
+                    "ingredientId": ingredient_id,
+                    "available": stock,
+                    "required": used,
+                    "unit": stock_unit,
+                })
+                continue
 
-            remaining = max(0, stock - used)
             ingredient_name = (
                 (ingredient or {}).get("ingredient_name")
                 or (ingredient or {}).get("IngredientName")
@@ -315,49 +342,79 @@ def confirm_order(order_id: str):
                 or inv.get("IngredientName")
                 or str(ingredient_id)
             )
-
-            db["branch_inventory"].update_one({"_id": inv["_id"]}, {"$set": {
-                "stock_quantity": remaining,
-                "Stock": remaining,
-                "ingredient_name": ingredient_name,
-                "IngredientName": ingredient_name,
-                "unit": stock_unit,
-                "Unit": stock_unit,
-            }})
-
-            transaction = {
-                "orderId": order_id_value,
-                "order_id": order_id_value,
-                "branchId": branch_id,
-                "branch_id": branch_id,
-                "IngredientId": ingredient_id,
+            deductions.append({
+                "inv": inv,
                 "ingredient_id": ingredient_id,
-                "IngredientName": ingredient_name,
                 "ingredient_name": ingredient_name,
-                "beforeStock": stock,
+                "stock": stock,
+                "stock_unit": stock_unit,
                 "used": used,
-                "Used": used,
-                "unit": stock_unit,
-                "Unit": stock_unit,
-                "remaining": remaining,
-                "Remaining": remaining,
-                "createdAt": datetime.now(),
-                "date": datetime.now().isoformat(),
-            }
-            if not db["inventory_transactions"].find_one({
-                "orderId": order_id_value,
-                "IngredientId": ingredient_id,
-                "branchId": branch_id,
-            }):
-                db["inventory_transactions"].insert_one(transaction)
-
-            stock_updates.append({
-                "IngredientId": ingredient_id,
-                "IngredientName": ingredient_name,
-                "Used": used,
-                "Unit": stock_unit,
-                "Remaining": remaining,
             })
+
+    if missing:
+        return {
+            "success": False,
+            "message": "Inventory item not found for order ingredients",
+            "missingIngredients": sorted(set(missing)),
+            "stockUpdated": [],
+        }
+
+    if insufficient:
+        return {
+            "success": False,
+            "message": "Insufficient inventory stock",
+            "insufficient": insufficient,
+            "stockUpdated": [],
+        }
+
+    stock_updates = []
+
+    for deduction in deductions:
+        inv = deduction["inv"]
+        ingredient_id = deduction["ingredient_id"]
+        ingredient_name = deduction["ingredient_name"]
+        stock = deduction["stock"]
+        stock_unit = deduction["stock_unit"]
+        used = deduction["used"]
+        remaining = stock - used
+
+        db["branch_inventory"].update_one({"_id": inv["_id"]}, {"$set": {
+            "stock_quantity": remaining,
+            "Stock": remaining,
+            "ingredient_name": ingredient_name,
+            "IngredientName": ingredient_name,
+            "unit": stock_unit,
+            "Unit": stock_unit,
+        }})
+
+        transaction = {
+            "orderId": order_id_value,
+            "order_id": order_id_value,
+            "branchId": branch_id,
+            "branch_id": branch_id,
+            "IngredientId": ingredient_id,
+            "ingredient_id": ingredient_id,
+            "IngredientName": ingredient_name,
+            "ingredient_name": ingredient_name,
+            "beforeStock": stock,
+            "used": used,
+            "Used": used,
+            "unit": stock_unit,
+            "Unit": stock_unit,
+            "remaining": remaining,
+            "Remaining": remaining,
+            "createdAt": datetime.now(),
+            "date": datetime.now().isoformat(),
+        }
+        db["inventory_transactions"].insert_one(transaction)
+
+        stock_updates.append({
+            "IngredientId": ingredient_id,
+            "IngredientName": ingredient_name,
+            "Used": used,
+            "Unit": stock_unit,
+            "Remaining": remaining,
+        })
 
     db["orders"].update_one({"_id": order["_id"]}, {
         "$set": {"status": "confirmed", "confirmedAt": datetime.now()}
