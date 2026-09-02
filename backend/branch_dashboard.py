@@ -5,191 +5,544 @@ from collections import defaultdict
 
 router = APIRouter()
 
+VALID_STATUSES = {"confirmed", "completed", "complete", "paid"}
+
+
 def branch_query(branch_id):
-    return {"$or": [{"branchId": branch_id}, {"branch_id": branch_id}, {"branchId": str(branch_id)}, {"branch_id": str(branch_id)}]}
+    bid = str(branch_id)
+    return {
+        "$or": [
+            {"branchId": branch_id}, {"branch_id": branch_id},
+            {"branchId": bid}, {"branch_id": bid},
+        ]
+    }
+
+
+def detail_branch_query(branch_id):
+    bid = str(branch_id)
+    return {
+        "$or": [
+            {"StoreNumber": bid}, {"storeNumber": bid},
+            {"branch_id": bid}, {"branchId": bid},
+        ]
+    }
+
 
 def order_date(order):
     value = order.get("confirmedAt") or order.get("createdAt") or order.get("order_date") or order.get("date")
-    if isinstance(value, datetime): return value.replace(tzinfo=None) if value.tzinfo else value
-    if hasattr(value, "date"): return value
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None) if value.tzinfo else value
+    if hasattr(value, "date"):
+        return value
     if isinstance(value, str):
-        try: return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
-        except Exception: return None
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+        except Exception:
+            return None
     return None
 
+
+def detail_date(row):
+    value = row.get("date") or row.get("createdAt") or row.get("order_date")
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None) if value.tzinfo else value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+        except Exception:
+            return None
+    return None
+
+
 def detail_to_item(row):
-    return {"menu_id": row.get("MenuId") or row.get("menu_id") or row.get("MenuItemId"), "name": row.get("Description") or row.get("description") or row.get("menu_name") or "Unknown", "quantity": row.get("Quantity", row.get("quantity", row.get("qty", 1))), "price": row.get("Price", row.get("price", row.get("unit_price", 0))), "total": row.get("Total", row.get("total", row.get("subtotal", 0))), "image": row.get("image")}
+    return {
+        "menu_id": row.get("MenuId") or row.get("menu_id") or row.get("MenuItemId"),
+        "name": row.get("Description") or row.get("description") or row.get("menu_name") or "Unknown",
+        "quantity": row.get("Quantity", row.get("quantity", row.get("qty", 1))),
+        "price": row.get("Price", row.get("price", row.get("unit_price", 0))),
+        "total": row.get("Total", row.get("total", row.get("subtotal", 0))),
+        "image": row.get("image"),
+    }
+
 
 def get_order_items(order):
     items = order.get("items") or []
-    if items: return items
+    if items:
+        return items
+
     oid = order.get("order_id") or order.get("orderId") or order.get("_id")
-    oid_str = str(oid) if oid is not None else None
-    if oid_str:
-        items = list(db["order_items"].find({"$or": [{"order_id": oid_str}, {"orderId": oid_str}]}, {"_id": 0}))
-        if items: return items
-        details = list(db["orders_details"].find({"$or": [{"OrderId": oid_str}, {"order_id": oid_str}, {"OrderId": oid}]}, {"_id": 0}))
-        if details: return [detail_to_item(row) for row in details]
-    return []
+    if oid is None:
+        return []
+
+    oid_str = str(oid)
+    items = list(db["order_items"].find({
+        "$or": [{"order_id": oid_str}, {"orderId": oid_str}]
+    }, {"_id": 0}))
+    if items:
+        return items
+
+    details = list(db["orders_details"].find({
+        "$or": [
+            {"OrderId": oid_str}, {"order_id": oid_str}, {"OrderId": oid}
+        ]
+    }, {"_id": 0}))
+    return [detail_to_item(row) for row in details]
+
 
 def all_order_reference_keys():
     keys = set()
     for order in db["orders"].find({}, {"_id": 1, "order_id": 1, "orderId": 1}):
         for value in (order.get("_id"), order.get("order_id"), order.get("orderId")):
-            if value is not None: keys.add(str(value))
+            if value is not None:
+                keys.add(str(value))
     return keys
+
 
 def get_orphan_order_details(branch_id):
     known = all_order_reference_keys()
-    rows = list(db["orders_details"].find({"$or": [{"StoreNumber": str(branch_id)}, {"storeNumber": str(branch_id)}, {"branch_id": str(branch_id)}, {"branchId": str(branch_id)}]}))
-    return [row for row in rows if str(row.get("OrderId") or row.get("order_id") or "") not in known]
+    rows = list(db["orders_details"].find(detail_branch_query(branch_id)))
+    return [
+        row for row in rows
+        if str(row.get("OrderId") or row.get("order_id") or "") not in known
+    ]
 
-def detail_date(row):
-    value = row.get("date") or row.get("createdAt") or row.get("order_date")
-    if isinstance(value, datetime): return value.replace(tzinfo=None) if value.tzinfo else value
-    if isinstance(value, str):
-        try: return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
-        except Exception: return None
-    return None
 
 def detail_sales(row):
     total = row.get("Total", row.get("total", row.get("subtotal")))
-    if total not in (None, ""): return float(total or 0)
+    if total not in (None, ""):
+        return float(total or 0)
     qty = float(row.get("Quantity", row.get("quantity", row.get("qty", 1))) or 1)
     price = float(row.get("Price", row.get("price", row.get("unit_price", 0))) or 0)
     return qty * price
 
+
 def menu_cost(menu_id):
+    if menu_id is None:
+        return 0.0
     total = 0.0
-    for row in db["menu_ingredients"].find({"$or": [{"menu_id": menu_id}, {"menu_id": str(menu_id)}]}):
+    for row in db["menu_ingredients"].find({
+        "$or": [{"menu_id": menu_id}, {"menu_id": str(menu_id)}]
+    }):
         ingredient_id = row.get("ingredient_id") or row.get("IngredientId")
         qty = float(row.get("quantity_required", row.get("Quantity", 0)) or 0)
-        ingredient = db["ingredients"].find_one({"$or": [{"ingredient_id": ingredient_id}, {"ingredient_id": str(ingredient_id)}, {"IngredientId": ingredient_id}, {"IngredientId": str(ingredient_id)}]})
-        if ingredient: total += qty * float(ingredient.get("cost_per_unit", ingredient.get("CostPerUnit", 0)) or 0)
+        ingredient = db["ingredients"].find_one({
+            "$or": [
+                {"ingredient_id": ingredient_id},
+                {"ingredient_id": str(ingredient_id)},
+                {"IngredientId": ingredient_id},
+                {"IngredientId": str(ingredient_id)},
+            ]
+        })
+        if ingredient:
+            total += qty * float(
+                ingredient.get("cost_per_unit", ingredient.get("CostPerUnit", 0)) or 0
+            )
     return total
 
+
+def find_menu_id_for_detail(row, branch_id):
+    menu_id = row.get("MenuId") or row.get("menu_id") or row.get("MenuItemId")
+    if menu_id is not None:
+        return menu_id
+
+    name = row.get("Description") or row.get("description") or row.get("menu_name")
+    if not name:
+        return None
+
+    bid = str(branch_id)
+    menu = db["menu_items"].find_one({
+        "$or": [
+            {"menu_id": menu_id, "branch_id": bid},
+            {"menu_name": name, "branch_id": bid},
+            {"menu_name": name, "branchId": bid},
+        ]
+    })
+    return menu.get("menu_id") if menu else None
+
+
+def detail_net_sales(row, branch_id):
+    sales = detail_sales(row)
+    qty = float(row.get("Quantity", row.get("quantity", row.get("qty", 1))) or 1)
+    menu_id = find_menu_id_for_detail(row, branch_id)
+    cost = qty * menu_cost(menu_id) if menu_id is not None else 0.0
+    return max(0.0, sales - cost)
+
+
 def order_financials(order):
-    sales = 0.0; cost = 0.0; items = get_order_items(order)
+    sales = 0.0
+    cost = 0.0
+    items = get_order_items(order)
+
     for item in items:
         qty = float(item.get("quantity", item.get("qty", 1)) or 1)
         price = float(item.get("price", item.get("unit_price", 0)) or 0)
         total = float(item.get("total", item.get("subtotal", 0)) or 0)
         sales += total if total > 0 else qty * price
         menu_id = item.get("menu_id") or item.get("menuItemId") or item.get("dishId")
-        if menu_id is not None: cost += qty * menu_cost(menu_id)
-    if not items: sales = float(order.get("total", order.get("total_amount", 0)) or 0)
+        if menu_id is not None:
+            cost += qty * menu_cost(menu_id)
+
+    if not items:
+        sales = float(order.get("total", order.get("total_amount", 0)) or 0)
+
     return sales, cost, max(0.0, sales - cost)
 
+
 def get_inventory_usage(branch_id, limit=10):
-    rows = list(db["inventory_transactions"].find(branch_query(branch_id)).sort("createdAt", -1).limit(limit))
-    return [{"ingredient": row.get("IngredientName") or row.get("ingredient_name") or "Unknown", "used": row.get("used", row.get("Used", 0)), "unit": row.get("unit", row.get("Unit", "")), "remaining": row.get("remaining", row.get("Remaining", 0)), "orderId": row.get("orderId", row.get("order_id", "")), "date": str(row.get("createdAt", row.get("date", "")))} for row in rows]
+    rows = list(
+        db["inventory_transactions"]
+        .find(branch_query(branch_id))
+        .sort("createdAt", -1)
+        .limit(limit)
+    )
+    return [
+        {
+            "ingredient": row.get("IngredientName") or row.get("ingredient_name") or "Unknown",
+            "used": row.get("used", row.get("Used", 0)),
+            "unit": row.get("unit", row.get("Unit", "")),
+            "remaining": row.get("remaining", row.get("Remaining", 0)),
+            "orderId": row.get("orderId", row.get("order_id", "")),
+            "date": str(row.get("createdAt", row.get("date", ""))),
+        }
+        for row in rows
+    ]
+
 
 def recent_menus_sold(orders, limit=2, branch_id=None):
-    result = []; seen = set()
+    result = []
+    seen = set()
+
     for order in sorted(orders, key=lambda o: order_date(o) or datetime.min, reverse=True):
         for item in get_order_items(order):
-            menu_id = item.get("menu_id") or item.get("menuItemId") or item.get("dishId"); key = str(menu_id or item.get("name") or "unknown")
-            if key in seen: continue
-            seen.add(key); result.append({"menuId": menu_id, "name": item.get("name") or item.get("menu_name") or "Unknown", "quantity": int(item.get("quantity", item.get("qty", 1)) or 1), "image": item.get("image") or "/menu/default.png"})
-            if len(result) >= limit: return result
+            menu_id = item.get("menu_id") or item.get("menuItemId") or item.get("dishId")
+            key = str(menu_id or item.get("name") or "unknown")
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append({
+                "menuId": menu_id,
+                "name": item.get("name") or item.get("menu_name") or "Unknown",
+                "quantity": int(item.get("quantity", item.get("qty", 1)) or 1),
+                "image": item.get("image") or "/menu/default.png",
+            })
+            if len(result) >= limit:
+                return result
+
     if branch_id:
-        for row in sorted(get_orphan_order_details(branch_id), key=lambda r: detail_date(r) or datetime.min, reverse=True):
-            menu_id = row.get("MenuId") or row.get("menu_id") or row.get("MenuItemId"); key = str(menu_id or row.get("Description") or "unknown")
-            if key in seen: continue
-            seen.add(key); result.append({"menuId": menu_id, "name": row.get("Description") or row.get("description") or "Unknown", "quantity": int(row.get("Quantity", row.get("quantity", 1)) or 1), "image": row.get("image") or "/menu/default.png"})
-            if len(result) >= limit: return result
+        for row in sorted(
+            get_orphan_order_details(branch_id),
+            key=lambda r: detail_date(r) or datetime.min,
+            reverse=True,
+        ):
+            menu_id = row.get("MenuId") or row.get("menu_id") or row.get("MenuItemId")
+            key = str(menu_id or row.get("Description") or "unknown")
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append({
+                "menuId": menu_id,
+                "name": row.get("Description") or row.get("description") or "Unknown",
+                "quantity": int(row.get("Quantity", row.get("quantity", 1)) or 1),
+                "image": row.get("image") or "/menu/default.png",
+            })
+            if len(result) >= limit:
+                return result
+
     return result
+
+
+def branch_daily_sales(branch_id, start_date, end_date):
+    """Return daily net sales for a branch.
+
+    The project has two data shapes: some historical orders are in `orders`,
+    while newer/detail data is stored in `orders_details`.  Prediction must
+    therefore not depend on an order/details relationship.  If a branch has
+    order details, those details are used as the authoritative sales source;
+    otherwise the function falls back to the orders collection.
+    """
+    daily = defaultdict(float)
+    detail_rows = list(db["orders_details"].find(detail_branch_query(branch_id)))
+
+    valid_detail_rows = []
+    for row in detail_rows:
+        dt = detail_date(row)
+        if dt and start_date <= dt.date() <= end_date:
+            valid_detail_rows.append((row, dt))
+
+    if valid_detail_rows:
+        for row, dt in valid_detail_rows:
+            daily[dt.date()] += detail_net_sales(row, branch_id)
+        return daily
+
+    for order in db["orders"].find(branch_query(branch_id)):
+        if str(order.get("status", "")).strip().lower() not in VALID_STATUSES:
+            continue
+        dt = order_date(order)
+        if dt and start_date <= dt.date() <= end_date:
+            daily[dt.date()] += order_financials(order)[2]
+
+    return daily
+
 
 def linear_regression_predict(values, horizon):
     n = len(values)
-    if n == 0: return [0.0] * horizon
-    if n == 1: return [round(max(0.0, values[0]), 2)] * horizon
-    x = list(range(1, n + 1)); xm = sum(x) / n; ym = sum(values) / n
+    if n == 0:
+        return [0.0] * horizon
+    if n == 1:
+        return [round(max(0.0, values[0]), 2)] * horizon
+
+    x = list(range(1, n + 1))
+    xm = sum(x) / n
+    ym = sum(values) / n
     den = sum((v - xm) ** 2 for v in x)
-    slope = sum((xi - xm) * (yi - ym) for xi, yi in zip(x, values)) / den if den else 0.0
+    slope = (
+        sum((xi - xm) * (yi - ym) for xi, yi in zip(x, values)) / den
+        if den else 0.0
+    )
     intercept = ym - slope * xm
-    return [round(max(0.0, intercept + slope * (n + i)), 2) for i in range(1, horizon + 1)]
+
+    return [
+        round(max(0.0, intercept + slope * (n + i)), 2)
+        for i in range(1, horizon + 1)
+    ]
+
 
 def sales_prediction(branch_id, history_days=30, horizon=7):
-    valid = {"confirmed", "completed", "complete", "paid"}; branch_orders = []
-    for order in db["orders"].find(branch_query(branch_id)):
-        if str(order.get("status", "")).strip().lower() in valid:
-            dt = order_date(order)
-            if dt: branch_orders.append((order, dt))
-    anchor = max((dt for _, dt in branch_orders), default=datetime.now()).date(); start = anchor - timedelta(days=history_days - 1); daily = defaultdict(float)
-    for order, dt in branch_orders:
-        if start <= dt.date() <= anchor: daily[dt.date()] += order_financials(order)[2]
-    history = [round(daily[start + timedelta(days=i)], 2) for i in range(history_days)]; predictions = linear_regression_predict(history, horizon)
-    forecast = [{"date": str(anchor + timedelta(days=i)), "predictedSales": predictions[i - 1]} for i in range(1, horizon + 1)]
-    return {"algorithm": "Linear Regression", "historyDays": history_days, "forecastDays": horizon, "anchorDate": str(anchor), "historicalSales": history, "forecast": forecast, "nextDay": predictions[0] if predictions else 0.0}
+    # Anchor each branch to its own newest available sales date.
+    # This prevents BR001's dates from determining the prediction window
+    # for BR002/BR003/BR004.
+    today = datetime.now().date()
+    all_detail_dates = []
+    for row in db["orders_details"].find(detail_branch_query(branch_id), {"date": 1, "createdAt": 1, "order_date": 1}):
+        dt = detail_date(row)
+        if dt:
+            all_detail_dates.append(dt.date())
+
+    all_order_dates = []
+    if not all_detail_dates:
+        for order in db["orders"].find(branch_query(branch_id), {"confirmedAt": 1, "createdAt": 1, "order_date": 1, "date": 1, "status": 1}):
+            if str(order.get("status", "")).strip().lower() in VALID_STATUSES:
+                dt = order_date(order)
+                if dt:
+                    all_order_dates.append(dt.date())
+
+    available_dates = all_detail_dates or all_order_dates
+    anchor = max(available_dates) if available_dates else today
+    start = anchor - timedelta(days=history_days - 1)
+
+    daily = branch_daily_sales(branch_id, start, anchor)
+    history = [
+        round(daily[start + timedelta(days=i)], 2)
+        for i in range(history_days)
+    ]
+
+    predictions = linear_regression_predict(history, horizon)
+    forecast = [
+        {
+            "date": str(anchor + timedelta(days=i)),
+            "predictedSales": predictions[i - 1],
+        }
+        for i in range(1, horizon + 1)
+    ]
+
+    return {
+        "algorithm": "Linear Regression",
+        "historyDays": history_days,
+        "forecastDays": horizon,
+        "anchorDate": str(anchor),
+        "historicalSales": history,
+        "forecast": forecast,
+        "nextDay": predictions[0] if predictions else 0.0,
+    }
+
 
 def calculate_growth(branch_id):
-    valid = {"confirmed", "completed", "complete", "paid"}
+    """Compare the latest 7-day sales period with the previous 7 days."""
     now = datetime.now()
     current_anchor = now.replace(hour=0, minute=0, second=0, microsecond=0)
     dated = []
-    for order in db["orders"].find(branch_query(branch_id)):
-        if str(order.get("status", "")).strip().lower() in valid:
-            dt = order_date(order)
-            if dt: dated.append((dt, order_financials(order)[0]))
-    for row in get_orphan_order_details(branch_id):
-        dt = detail_date(row)
-        if dt: dated.append((dt, detail_sales(row)))
-    if not dated: return 0.0
+
+    details = list(db["orders_details"].find(detail_branch_query(branch_id)))
+    if details:
+        for row in details:
+            dt = detail_date(row)
+            if dt:
+                dated.append((dt, detail_sales(row)))
+    else:
+        for order in db["orders"].find(branch_query(branch_id)):
+            if str(order.get("status", "")).strip().lower() in VALID_STATUSES:
+                dt = order_date(order)
+                if dt:
+                    dated.append((dt, order_financials(order)[0]))
+
+    if not dated:
+        return 0.0
+
     latest = max(dt for dt, _ in dated).replace(hour=0, minute=0, second=0, microsecond=0)
     if any(dt >= current_anchor - timedelta(days=6) for dt, _ in dated):
         end = current_anchor + timedelta(days=1)
     else:
         end = latest + timedelta(days=1)
+
     current_start = end - timedelta(days=7)
     previous_start = current_start - timedelta(days=7)
-    current_sales = sum(sales for dt, sales in dated if current_start <= dt < end)
-    previous_sales = sum(sales for dt, sales in dated if previous_start <= dt < current_start)
-    if previous_sales <= 0: return 100.0 if current_sales > 0 else 0.0
+    current_sales = sum(s for dt, s in dated if current_start <= dt < end)
+    previous_sales = sum(s for dt, s in dated if previous_start <= dt < current_start)
+
+    if previous_sales <= 0:
+        return 100.0 if current_sales > 0 else 0.0
     return round(((current_sales - previous_sales) / previous_sales) * 100, 2)
+
 
 @router.get("/api/branch/dashboard/{branch_id}")
 def branch_dashboard(branch_id: str):
-    valid = {"confirmed", "completed", "complete", "paid"}
-    all_orders = [o for o in db["orders"].find(branch_query(branch_id)) if str(o.get("status", "")).strip().lower() in valid]
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0); today_orders = [o for o in all_orders if order_date(o) and order_date(o) >= today_start]
-    orphan_rows = get_orphan_order_details(branch_id); today_details = [r for r in orphan_rows if detail_date(r) and detail_date(r) >= today_start]
+    valid = VALID_STATUSES
+    all_orders = [
+        o for o in db["orders"].find(branch_query(branch_id))
+        if str(o.get("status", "")).strip().lower() in valid
+    ]
+
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_orders = [
+        o for o in all_orders
+        if order_date(o) and order_date(o) >= today_start
+    ]
+
+    orphan_rows = get_orphan_order_details(branch_id)
+    today_details = [
+        r for r in orphan_rows
+        if detail_date(r) and detail_date(r) >= today_start
+    ]
+
     total_revenue = sum(order_financials(o)[2] for o in all_orders) + sum(detail_sales(r) for r in orphan_rows)
     today_revenue = sum(order_financials(o)[2] for o in today_orders) + sum(detail_sales(r) for r in today_details)
     today_sales = sum(order_financials(o)[0] for o in today_orders) + sum(detail_sales(r) for r in today_details)
-    detail_order_ids = {str(r.get("OrderId") or r.get("order_id")) for r in today_details if r.get("OrderId") or r.get("order_id")}
-    items_sold = sum(int(item.get("quantity", item.get("qty", 1)) or 1) for order in all_orders for item in get_order_items(order)) + sum(int(r.get("Quantity", r.get("quantity", 1)) or 1) for r in orphan_rows)
-    sales_map = defaultdict(float); week_start = today_start - timedelta(days=6)
+
+    detail_order_ids = {
+        str(r.get("OrderId") or r.get("order_id"))
+        for r in today_details
+        if r.get("OrderId") or r.get("order_id")
+    }
+
+    items_sold = (
+        sum(
+            int(item.get("quantity", item.get("qty", 1)) or 1)
+            for order in all_orders
+            for item in get_order_items(order)
+        )
+        + sum(int(r.get("Quantity", r.get("quantity", 1)) or 1) for r in orphan_rows)
+    )
+
+    sales_map = defaultdict(float)
+    week_start = today_start - timedelta(days=6)
     for order in all_orders:
         dt = order_date(order)
-        if dt and dt >= week_start: sales_map[dt.strftime("%a")] += order_financials(order)[2]
+        if dt and dt >= week_start:
+            sales_map[dt.strftime("%a")] += order_financials(order)[2]
     for row in orphan_rows:
         dt = detail_date(row)
-        if dt and dt >= week_start: sales_map[dt.strftime("%a")] += detail_sales(row)
-    weekly_sales = [{"day": d, "sales": round(sales_map[d], 2)} for d in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]]
-    usage = get_inventory_usage(branch_id, 10); prediction = sales_prediction(branch_id); recent = recent_menus_sold(all_orders, 2, branch_id)
-    return {"orders": len(today_orders) + len(detail_order_ids), "totalOrders": len(all_orders), "revenue": round(today_revenue, 2), "todaySales": round(today_sales, 2), "totalRevenue": round(total_revenue, 2), "customers": len(today_orders) + len(detail_order_ids), "itemsSold": items_sold, "growth": calculate_growth(branch_id), "weekly_sales": weekly_sales, "inventory_usage": usage, "inventoryUsage": usage, "recent_menus": recent, "recentMenus": recent, "current_menu_sold": recent[0] if recent else None, "currentMenuSold": recent[0] if recent else None, "sales_prediction": prediction, "salesPrediction": prediction}
+        if dt and dt >= week_start:
+            sales_map[dt.strftime("%a")] += detail_sales(row)
+
+    weekly_sales = [
+        {"day": d, "sales": round(sales_map[d], 2)}
+        for d in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    ]
+
+    usage = get_inventory_usage(branch_id, 10)
+    prediction = sales_prediction(branch_id)
+    recent = recent_menus_sold(all_orders, 2, branch_id)
+
+    return {
+        "orders": len(today_orders) + len(detail_order_ids),
+        "totalOrders": len(all_orders),
+        "revenue": round(today_revenue, 2),
+        "todaySales": round(today_sales, 2),
+        "totalRevenue": round(total_revenue, 2),
+        "customers": len(today_orders) + len(detail_order_ids),
+        "itemsSold": items_sold,
+        "growth": calculate_growth(branch_id),
+        "weekly_sales": weekly_sales,
+        "inventory_usage": usage,
+        "inventoryUsage": usage,
+        "recent_menus": recent,
+        "recentMenus": recent,
+        "current_menu_sold": recent[0] if recent else None,
+        "currentMenuSold": recent[0] if recent else None,
+        "sales_prediction": prediction,
+        "salesPrediction": prediction,
+    }
+
 
 @router.get("/api/branch/dashboard/{branch_id}/sales-prediction")
-def branch_sales_prediction(branch_id: str): return sales_prediction(branch_id)
+def branch_sales_prediction(branch_id: str):
+    return sales_prediction(branch_id)
+
 
 @router.get("/api/dashboard/inventory-usage/{branch_id}")
-def inventory_usage(branch_id: str): return {"success": True, "data": get_inventory_usage(branch_id, 20)}
+def inventory_usage(branch_id: str):
+    return {"success": True, "data": get_inventory_usage(branch_id, 20)}
+
 
 @router.get("/api/admin/dashboard")
 def admin_dashboard():
-    valid = {"confirmed", "completed", "complete", "paid"}; orders = []
+    valid = VALID_STATUSES
+    orders = []
     for order in db["orders"].find({}):
         if str(order.get("status", "")).strip().lower() in valid:
             dt = order_date(order)
-            if dt: orders.append((order, dt))
-    branches = list(db["branches"].find({}, {"_id": 0})); branch_names = {}
+            if dt:
+                orders.append((order, dt))
+
+    branches = list(db["branches"].find({}, {"_id": 0}))
+    branch_names = {}
     for branch in branches:
-        bid = str(branch.get("branch_id") or branch.get("branchId") or branch.get("storeNumber") or "")
-        branch_names[bid] = branch.get("branch_name") or branch.get("branchName") or branch.get("city") or bid
-    if not orders: return {"total_orders": 0, "branch_orders": [], "week_start": None, "week_end": None}
-    latest_date = max(dt for _, dt in orders); week_start = (latest_date - timedelta(days=latest_date.weekday())).replace(hour=0, minute=0, second=0, microsecond=0); week_end = week_start + timedelta(days=7)
-    weekly = [(order, dt) for order, dt in orders if week_start <= dt < week_end]; counts = defaultdict(int)
-    for order, _ in weekly: counts[str(order.get("branch_id") or order.get("branchId") or "Unknown")] += 1
-    ranking = [{"storeNumber": bid, "orders": count, "branchName": branch_names.get(bid, bid)} for bid, count in counts.items()]; ranking.sort(key=lambda row: (-row["orders"], str(row["storeNumber"])))
-    return {"total_orders": len(weekly), "branch_orders": ranking, "week_start": week_start.date().isoformat(), "week_end": (week_end - timedelta(days=1)).date().isoformat()}
+        bid = str(
+            branch.get("branch_id")
+            or branch.get("branchId")
+            or branch.get("storeNumber")
+            or ""
+        )
+        branch_names[bid] = (
+            branch.get("branch_name")
+            or branch.get("branchName")
+            or branch.get("city")
+            or bid
+        )
+
+    if not orders:
+        return {
+            "total_orders": 0,
+            "branch_orders": [],
+            "week_start": None,
+            "week_end": None,
+        }
+
+    latest_date = max(dt for _, dt in orders)
+    week_start = (
+        latest_date - timedelta(days=latest_date.weekday())
+    ).replace(hour=0, minute=0, second=0, microsecond=0)
+    week_end = week_start + timedelta(days=7)
+
+    weekly = [(order, dt) for order, dt in orders if week_start <= dt < week_end]
+    counts = defaultdict(int)
+    for order, _ in weekly:
+        bid = str(order.get("branch_id") or order.get("branchId") or "Unknown")
+        counts[bid] += 1
+
+    ranking = [
+        {
+            "storeNumber": bid,
+            "orders": count,
+            "branchName": branch_names.get(bid, bid),
+        }
+        for bid, count in counts.items()
+    ]
+    ranking.sort(key=lambda row: (-row["orders"], str(row["storeNumber"])))
+
+    return {
+        "total_orders": len(weekly),
+        "branch_orders": ranking,
+        "week_start": week_start.date().isoformat(),
+        "week_end": (week_end - timedelta(days=1)).date().isoformat(),
+    }
